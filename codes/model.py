@@ -1312,7 +1312,7 @@ class KGEModel(nn.Module):
                                 # print(positive_sample[i])
                                 # print(positive_sample[:, 0][i].item())
 
-                                print(ranking)
+                                print("MR: "+str(ranking))
                                 entity = get_actual_name(str(positive_sample[:, 0][i].item()), args.data_path)
                                 print(entity + "\t " + getRelation_name(str(positive_rel[i].item()), args.data_path) + "\tlist[ ]")
                                 tSize = argsort[i, :].size(0)
