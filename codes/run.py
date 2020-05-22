@@ -652,7 +652,7 @@ def manual_argument_pass(args):
 
 
 def main(args):
-    args = manual_argument_pass(args)
+    # args = manual_argument_pass(args)
 
     if not torch.cuda.is_available():
         args.cuda = False
