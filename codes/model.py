@@ -1326,11 +1326,11 @@ class KGEModel(nn.Module):
                             #     print("]")
 
                             logs.append({
-                                ' MRR': 1.0 / ranking,
-                                ' MR': float(ranking),
-                                ' HITS@1': 1.0 if ranking <= 1 else 0.0,
-                                ' HITS@3': 1.0 if ranking <= 3 else 0.0,
-                                ' HITS@10': 1.0 if ranking <= 10 else 0.0,
+                                'MRR': 1.0 / ranking,
+                                'MR': float(ranking),
+                                'HITS@1': 1.0 if ranking <= 1 else 0.0,
+                                'HITS@3': 1.0 if ranking <= 3 else 0.0,
+                                'HITS@10': 1.0 if ranking <= 10 else 0.0,
                             })
                             # results = "MRR: " + str(1.0 / ranking) + "; MR: " + str(
                             #     float(ranking)) + "; HITS@1: " + str(1.0 if ranking <= 1 else 0.0) + "; HITS@3: " + str(
