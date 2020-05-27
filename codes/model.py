@@ -23,6 +23,7 @@ from torch.utils.data import DataLoader
 
 from dataloader import TestDataset
 import io
+import pandas as pd
 
 # regularization terms options
 L2 = True
@@ -33,20 +34,7 @@ PROJECT_CUBE = False
 PROJECT_SPHERE = False
 
 
-def get_actual_name(entityId, data_path):
-    with open(os.path.join(data_path, 'entities.dict')) as fin:
-        for line in fin:
-            eid, entity = line.strip().split('\t')
-            if eid == entityId:
-                return entity
 
-
-def getRelation_name(relationId, data_path):
-    with open(os.path.join(data_path, 'relations.dict')) as fin:
-        for line in fin:
-            rid, relation = line.strip().split('\t')
-            if rid == relationId:
-                return relation
 
 
 class KGEModel(nn.Module):
@@ -91,6 +79,8 @@ class KGEModel(nn.Module):
             a=-0.1,
             b=0.1
         )
+
+
 
         ent_dim_mult, rel_dim_mult = self.compute_multipliers()
 
@@ -141,6 +131,20 @@ class KGEModel(nn.Module):
         if model_name not in ['TransE', 'DistMult', 'ComplEx', 'RotatE', 'pRotatE', 'TransRotatE', 'QuatE',
                               'TransQuatE', 'sTransRotatE', 'sTransQuatE', 'QuatEVersor']:
             raise ValueError('model %s not supported' % model_name)
+
+    def load_entities(self,args):
+        data_path = args.data_path
+        all_entities = pd.read_table(os.path.join(data_path, 'entities.dict'), delimiter='\t', names=["id", "entities"], dtype=str)
+        all_entities = pd.DataFrame(all_entities)
+
+        return all_entities
+
+    def load_relations(self, args):
+        data_path = args.data_path
+        all_relations = pd.read_table(os.path.join(data_path, 'relations.dict'), delimiter='\t', names=["id", "relations"],
+                                     dtype=str)
+        all_relations = pd.DataFrame(all_relations)
+        return all_relations
 
     def compute_multipliers(self):
         if self.model_name == 'RotatE':
@@ -328,7 +332,7 @@ class KGEModel(nn.Module):
             'tail': tail
 
         }
-        arg_list = [head] + relation_list + [tail]
+        # arg_list = [head] + relation_list + [tail]
         # arg_list += [mode] if self.model_name not in ['biRotatE', 'TransRotatE', 'TransQuatE', 'QuatE', 'sTransQuatE','sTransRotatE'] else []
         if self.model_name not in ['biRotatE', 'TransRotatE', 'TransQuatE', 'QuatE', 'sTransQuatE', 'sTransRotatE',
                                    'QuatEVersor']:
@@ -1269,6 +1273,10 @@ class KGEModel(nn.Module):
             step = 0
             total_steps = sum([len(dataset) for dataset in test_dataset_list])
 
+            all_entities=model.load_entities(args)
+            all_relations = model.load_relations(args)
+
+
             with torch.no_grad():
                 for test_dataset in test_dataset_list:
                     for idx, positive_sample, negative_sample, filter_bias, mode in test_dataset:
@@ -1308,22 +1316,21 @@ class KGEModel(nn.Module):
                             assert ranking.size(0) == 1
                             # ranking + 1 is the true ranking used in evaluation metrics
                             ranking = 1 + ranking.item()
-                            if positive_rel[i] == 3 and mode == 'tail-batch' and ranking<=10:  # 3= hasEntity
-                                # print(positive_sample[i])
-                                # print(positive_sample[:, 0][i].item())
 
-                                # print("MR: "+str(ranking)+"\t MRR:" +str(1.0 / ranking))
-                                entity = get_actual_name(str(positive_sample[:, 0][i].item()), args.data_path)
-                                print(entity + "\t " + getRelation_name(str(positive_rel[i].item()), args.data_path) + "\tlist[ ]")
-                                tSize = argsort[i, :].size(0)
-                                data = argsort[i, :]
-                                rank = argsort[i, :].nonzero()
-                                print("list= [")
-                                for j in range(tSize):
-                                    entity_name = get_actual_name(str(data[j].item()), args.data_path)
-                                    if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
-                                        print(str(entity_name) + "---" + str(int(rank[j].item())+1))
-                                print("]")
+                            if ranking <= 10:
+                                if positive_rel[i] == 3 and mode == 'tail-batch' :  # 3= hasEntity
+                                    print(ranking)
+                                    entity = all_entities.at[int(positive_sample[:, 0][i].item()),"entities"]
+                                    print(entity + "\t " + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]")
+                                    tSize = argsort[i, :].size(0)
+                                    data = argsort[i, :]
+                                    rank = argsort[i, :].nonzero()
+                                    print("list= [")
+                                    for j in range(tSize):
+                                        entity_name = all_entities.at[int(data[j].item()),"entities"]
+                                        if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
+                                            print(str(entity_name) + "---" + str(int(rank[j].item())+1))
+                                    print("]")
 
                             logs.append({
                                 'MRR': 1.0 / ranking,
@@ -1332,11 +1339,6 @@ class KGEModel(nn.Module):
                                 'HITS@3': 1.0 if ranking <= 3 else 0.0,
                                 'HITS@10': 1.0 if ranking <= 10 else 0.0,
                             })
-                            # results = "MRR: " + str(1.0 / ranking) + "; MR: " + str(
-                            #     float(ranking)) + "; HITS@1: " + str(1.0 if ranking <= 1 else 0.0) + "; HITS@3: " + str(
-                            #     1.0 if ranking <= 3 else 0.0) + "; HITS@10: " + str(
-                            #     1.0 if ranking <= 10 else 0.0) + "\n"
-
                         if step % args.test_log_steps == 0:
                             logging.info('Evaluating the model... (%d/%d)' % (step, total_steps))
 
