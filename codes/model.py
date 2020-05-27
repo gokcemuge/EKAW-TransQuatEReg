@@ -1310,7 +1310,7 @@ class KGEModel(nn.Module):
                             positive_rel = positive_sample[:, 1]
                         else:
                             raise ValueError('mode %s not supported' % mode)
-
+                        ranked_triples=""
                         for i in range(batch_size):
                             # Notice that argsort is not ranking
                             ranking = (argsort[i, :] == positive_arg[i]).nonzero()
@@ -1319,19 +1319,20 @@ class KGEModel(nn.Module):
                             ranking = 1 + ranking.item()
 
                             if ranking <= 10:
-                                if positive_rel[i] == 3 and mode == 'tail-batch' :  # 3= hasEntity
-                                    print(ranking)
+                                if  mode == 'tail-batch' :  # 3= hasEntity
+                                    ranked_triples += str(ranking)+"\n"
                                     entity = all_entities.at[int(positive_sample[:, 0][i].item()),"entities"]
-                                    print(entity + "\t " + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]")
+                                    ranked_triples += str(entity + "\t" + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]\n")
                                     tSize = argsort[i, :].size(0)
                                     data = argsort[i, :]
                                     rank = argsort[i, :].nonzero()
-                                    print("list= [")
+                                    ranked_triples += "list= ["
                                     for j in range(tSize):
                                         entity_name = all_entities.at[int(data[j].item()),"entities"]
                                         if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
-                                            print(str(entity_name) + "---" + str(int(rank[j].item())+1))
-                                    print("]")
+                                            ranked_triples += str(str(entity_name) + "---" + str(int(rank[j].item())+1))+"\n"
+                                    ranked_triples +="]\n"
+                                    # print(ranked_triples)
 
                             logs.append({
                                 'MRR': 1.0 / ranking,
@@ -1348,9 +1349,9 @@ class KGEModel(nn.Module):
             metrics = {}
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-            # entity_file = io.open("data/SD2020/result.txt", "a+", encoding="utf-8")
-            # entity_file.write(resilts)
-            # entity_file.close()
+            ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
+            ranked_triple_file.write(ranked_triples)
+            ranked_triple_file.close()
 
         return metrics
 
