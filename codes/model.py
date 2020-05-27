@@ -1308,22 +1308,22 @@ class KGEModel(nn.Module):
                             assert ranking.size(0) == 1
                             # ranking + 1 is the true ranking used in evaluation metrics
                             ranking = 1 + ranking.item()
-                            # if positive_rel[i] == 3 and mode == 'tail-batch':  # 3= hasEntity
-                            #     # print(positive_sample[i])
-                            #     # print(positive_sample[:, 0][i].item())
-                            #
-                            #     # print("MR: "+str(ranking)+"\t MRR:" +str(1.0 / ranking))
-                            #     entity = get_actual_name(str(positive_sample[:, 0][i].item()), args.data_path)
-                            #     print(entity + "\t " + getRelation_name(str(positive_rel[i].item()), args.data_path) + "\tlist[ ]")
-                            #     tSize = argsort[i, :].size(0)
-                            #     data = argsort[i, :]
-                            #     rank = argsort[i, :].nonzero()
-                            #     print("list= [")
-                            #     for j in range(tSize):
-                            #         entity_name = get_actual_name(str(data[j].item()), args.data_path)
-                            #         if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
-                            #             print(str(entity_name) + "---" + str(int(rank[j].item())+1))
-                            #     print("]")
+                            if positive_rel[i] == 3 and mode == 'tail-batch' and ranking<=10:  # 3= hasEntity
+                                # print(positive_sample[i])
+                                # print(positive_sample[:, 0][i].item())
+
+                                # print("MR: "+str(ranking)+"\t MRR:" +str(1.0 / ranking))
+                                entity = get_actual_name(str(positive_sample[:, 0][i].item()), args.data_path)
+                                print(entity + "\t " + getRelation_name(str(positive_rel[i].item()), args.data_path) + "\tlist[ ]")
+                                tSize = argsort[i, :].size(0)
+                                data = argsort[i, :]
+                                rank = argsort[i, :].nonzero()
+                                print("list= [")
+                                for j in range(tSize):
+                                    entity_name = get_actual_name(str(data[j].item()), args.data_path)
+                                    if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
+                                        print(str(entity_name) + "---" + str(int(rank[j].item())+1))
+                                print("]")
 
                             logs.append({
                                 'MRR': 1.0 / ranking,
