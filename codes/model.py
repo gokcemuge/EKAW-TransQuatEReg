@@ -134,14 +134,14 @@ class KGEModel(nn.Module):
 
     def load_entities(self,args):
         data_path = args.data_path
-        all_entities = pd.read_table(os.path.join(data_path, 'entities.dict'), delimiter='\t', names=["id", "entities"], dtype=str)
+        all_entities = pd.read_csv(os.path.join(data_path, 'entities.dict'), delimiter='\t', names=["id", "entities"], dtype=str)
         all_entities = pd.DataFrame(all_entities)
 
         return all_entities
 
     def load_relations(self, args):
         data_path = args.data_path
-        all_relations = pd.read_table(os.path.join(data_path, 'relations.dict'), delimiter='\t', names=["id", "relations"],
+        all_relations = pd.read_csv(os.path.join(data_path, 'relations.dict'), delimiter='\t', names=["id", "relations"],
                                      dtype=str)
         all_relations = pd.DataFrame(all_relations)
         return all_relations
@@ -1274,6 +1274,7 @@ class KGEModel(nn.Module):
             total_steps = sum([len(dataset) for dataset in test_dataset_list])
 
             all_entities=model.load_entities(args)
+
             all_relations = model.load_relations(args)
 
 
