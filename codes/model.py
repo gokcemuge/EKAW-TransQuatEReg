@@ -1319,7 +1319,7 @@ class KGEModel(nn.Module):
                             ranking = 1 + ranking.item()
 
                             if ranking <= 10:
-                                if  mode == 'tail-batch' :  # 3= hasEntity
+                                if positive_rel[i] == 3 and mode == 'tail-batch' :  # 3= hasTypes
                                     ranked_triples += str(ranking)+"\n"
                                     entity = all_entities.at[int(positive_sample[:, 0][i].item()),"entities"]
                                     ranked_triples += str(entity + "\t" + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]\n")
