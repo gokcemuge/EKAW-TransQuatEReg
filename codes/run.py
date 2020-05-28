@@ -718,6 +718,7 @@ def main(args):
 
     args.nentity = nentity
     args.nrelation = nrelation
+    args.do_valid=False
 
     if args.inject:
         logging.info('With rule injection')
