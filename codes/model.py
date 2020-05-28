@@ -1318,16 +1318,16 @@ class KGEModel(nn.Module):
                             # ranking + 1 is the true ranking used in evaluation metrics
                             ranking = 1 + ranking.item()
 
-                            if ranking <= 10:
+                            if ranking <= 10 and args.do_test:
                                 if positive_rel[i] == 3 and mode == 'tail-batch' :  # 3= hasTypes
                                     ranked_triples += str(ranking)+"\n"
                                     entity = all_entities.at[int(positive_sample[:, 0][i].item()),"entities"]
                                     ranked_triples += str(entity + "\t" + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]\n")
-                                    tSize = argsort[i, :].size(0)
+                                    tsize = argsort[i, :].size(0)
                                     data = argsort[i, :]
                                     rank = argsort[i, :].nonzero()
                                     ranked_triples += "list= ["
-                                    for j in range(tSize):
+                                    for j in range(tsize):
                                         entity_name = all_entities.at[int(data[j].item()),"entities"]
                                         if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
                                             ranked_triples += str(str(entity_name) + "---" + str(int(rank[j].item())+1))+"\n"
@@ -1349,9 +1349,10 @@ class KGEModel(nn.Module):
             metrics = {}
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-            ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
-            ranked_triple_file.write(ranked_triples)
-            ranked_triple_file.close()
+            if args.do_test:
+                ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
+                ranked_triple_file.write(ranked_triples)
+                ranked_triple_file.close()
 
         return metrics
 
