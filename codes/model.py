@@ -1277,7 +1277,7 @@ class KGEModel(nn.Module):
 
 
             all_relations = model.load_relations(args)
-            # print(all_relations.head(12))
+
 
 
             with torch.no_grad():
