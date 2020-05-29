@@ -1321,7 +1321,7 @@ class KGEModel(nn.Module):
                             ranking = 1 + ranking.item()
 
                             if ranking <= 10 and args.do_test and mode == 'tail-batch' :
-                                if str(all_relations.at[int(positive_rel[i].item()),"relations"]) == "hasTypes" :  # 3= hasTypes
+                                if positive_rel[i].item() == 3 :  # 3= hasTypes
                                     ranked_triples += str(ranking)+"\n"
                                     entity = all_entities.at[int(positive_sample[:, 0][i].item()),"entities"]
                                     ranked_triples += str(entity + "\t" + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]\n")
@@ -1352,6 +1352,7 @@ class KGEModel(nn.Module):
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             if args.do_test:
+                print("Creating results")
                 ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
                 ranked_triple_file.write(ranked_triples)
                 ranked_triple_file.close()
