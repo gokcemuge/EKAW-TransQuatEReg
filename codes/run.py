@@ -40,7 +40,7 @@ RULE_BATCH_SIZE_SYM = -1
 GAMMA1 = [23]
 GAMMA2 = [25]
 N_NEGS_LIST = [10]
-N_STEPS_LIST = [10000]
+N_STEPS_LIST = [220000]
 # test next on [150000, 220000]
 
 # rules settings
