@@ -570,12 +570,16 @@ def run_grid(nentity, nrelation, train_triples,
                         info = info + key + ' - ' + str(val) + ';'
                     print(info)
                     # test
+
                     out_line = '#steps = {}, #negs = {}, dim = {};'.format(step, args.negative_sample_size,
                                                                            kge_model.hidden_dim)
+                    args.do_test=True
                     metrics = kge_model.test_step(kge_model, test_triples, all_true_triples, args)
+                    args.do_test = False
                     log_metrics('Test', step, metrics)
-                    values = [str(metrics['MRR']), str(metrics['MR']), str(metrics['HITS@1']), str(metrics['HITS@3']),
-                              str(metrics['HITS@10'])]
+
+                    values = ["MRR: "+str(metrics['MRR']), "MR: "+str(metrics['MR']), "HITS@1: "+str(metrics['HITS@1']), "HITS@3: "+str(metrics['HITS@3']),
+                              "HITS@10: "+str(metrics['HITS@10'])]
                     out_line = out_line + ';'.join(values)
                     print(out_line)
                     logging.info('\n-----------------------------------------------')

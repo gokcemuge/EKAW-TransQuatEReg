@@ -1313,10 +1313,8 @@ class KGEModel(nn.Module):
                             assert ranking.size(0) == 1
                             # ranking + 1 is the true ranking used in evaluation metrics
                             ranking = 1 + ranking.item()
-                            if args.do_test:
-                                print("Now calculating for test set")
 
-                            if ranking <= 10 and args.do_test and str(all_relations.at[int(positive_rel[
+                            if  args.do_test and  str(all_relations.at[int(positive_rel[
                                                             i].item()), "relations"]) == "hasTypes"  and mode == 'tail-batch' :
                                 # if positive_rel[i].item() == 3:  # 3= hasTypes ranking <= 10 and and args.do_test
                                 ranked_triples += str(ranking) + "\n"
@@ -1329,13 +1327,10 @@ class KGEModel(nn.Module):
                                 ranked_triples += "list= ["
                                 for j in range(tsize):
                                     entity_name = all_entities.at[int(data[j].item()), "entities"]
-                                    if entity_name in (
-                                            "Education", "Government", "Company", "Facility", "Healthcare", "Nonprofit",
-                                            "Other"):
+                                    if entity_name in ("Education", "Government", "Company", "Facility"):
                                         ranked_triples += str(
                                             str(entity_name) + "---" + str(int(rank[j].item()) + 1)) + "\n"
                                 ranked_triples += "]\n"
-                                # print(ranked_triples)
 
                             logs.append({
                                 'MRR': 1.0 / ranking,
@@ -1346,15 +1341,13 @@ class KGEModel(nn.Module):
                             })
                         if step % args.test_log_steps == 0:
                             logging.info('Evaluating the model... (%d/%d)' % (step, total_steps))
-
                         step += 1
 
-                if args.do_test:
-                    print("Creating results")
-                    ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
-                    ranked_triple_file.write(ranked_triples)
-                    ranked_triple_file.close()
-
+            if args.do_test:
+                print("Creating results")
+                ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
+                ranked_triple_file.write(ranked_triples)
+                ranked_triple_file.close()
             metrics = {}
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
