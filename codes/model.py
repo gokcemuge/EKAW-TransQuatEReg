@@ -1352,7 +1352,7 @@ class KGEModel(nn.Module):
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
             if args.do_test:
-                ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "w+", encoding="utf-8")
+                ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
                 ranked_triple_file.write(ranked_triples)
                 ranked_triple_file.close()
 
