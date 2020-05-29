@@ -1313,8 +1313,9 @@ class KGEModel(nn.Module):
                             assert ranking.size(0) == 1
                             # ranking + 1 is the true ranking used in evaluation metrics
                             ranking = 1 + ranking.item()
-                            if ranking <= 10 and args.do_test and mode == 'tail-batch':
-                                # if positive_rel[i].item() == 3:  # 3= hasTypes
+                            if str(all_relations.at[int(positive_rel[
+                                                            i].item()), "relations"]) == "hasTypes" and args.do_test and mode == 'tail-batch':
+                                # if positive_rel[i].item() == 3:  # 3= hasTypes ranking <= 10 and
                                 ranked_triples += str(ranking) + "\n"
                                 entity = all_entities.at[int(positive_sample[:, 0][i].item()), "entities"]
                                 ranked_triples += str(entity + "\t" + all_relations.at[
