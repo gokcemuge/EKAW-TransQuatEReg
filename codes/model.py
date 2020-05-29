@@ -1315,7 +1315,7 @@ class KGEModel(nn.Module):
                             ranking = 1 + ranking.item()
 
                             if str(all_relations.at[int(positive_rel[
-                                                            i].item()), "relations"]) == "hasTypes"  and mode == 'tail-batch' and ranking <= 100:
+                                                            i].item()), "relations"]) == "hasTypes"  and mode == 'tail-batch'  and args.do_test:
                                 # if positive_rel[i].item() == 3:  # 3= hasTypes ranking <= 10 and and args.do_test
                                 ranked_triples += str(ranking) + "\n"
                                 entity = all_entities.at[int(positive_sample[:, 0][i].item()), "entities"]
@@ -1333,7 +1333,7 @@ class KGEModel(nn.Module):
                                         ranked_triples += str(
                                             str(entity_name) + "---" + str(int(rank[j].item()) + 1)) + "\n"
                                 ranked_triples += "]\n"
-                                print(ranked_triples)
+                                # print(ranked_triples)
 
                             logs.append({
                                 'MRR': 1.0 / ranking,
