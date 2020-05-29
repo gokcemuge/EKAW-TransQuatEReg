@@ -1343,11 +1343,11 @@ class KGEModel(nn.Module):
                             logging.info('Evaluating the model... (%d/%d)' % (step, total_steps))
                         step += 1
 
-            if args.do_test:
-                print("Creating results")
-                ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
-                ranked_triple_file.write(ranked_triples)
-                ranked_triple_file.close()
+                    if args.do_test:
+                        print("Creating results")
+                        ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
+                        ranked_triple_file.write(ranked_triples)
+                        ranked_triple_file.close()
             metrics = {}
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
