@@ -34,9 +34,6 @@ PROJECT_CUBE = False
 PROJECT_SPHERE = False
 
 
-
-
-
 class KGEModel(nn.Module):
     def __init__(self, model_name, nentity, nrelation, ntriples, hidden_dim, args):
         super(KGEModel, self).__init__()
@@ -79,8 +76,6 @@ class KGEModel(nn.Module):
             a=-0.1,
             b=0.1
         )
-
-
 
         ent_dim_mult, rel_dim_mult = self.compute_multipliers()
 
@@ -132,17 +127,19 @@ class KGEModel(nn.Module):
                               'TransQuatE', 'sTransRotatE', 'sTransQuatE', 'QuatEVersor']:
             raise ValueError('model %s not supported' % model_name)
 
-    def load_entities(self,args):
+    def load_entities(self, args):
         data_path = args.data_path
-        all_entities = pd.read_csv(os.path.join(data_path, 'entities.dict'), delimiter='\t', names=["id", "entities"], dtype=str)
+        all_entities = pd.read_csv(os.path.join(data_path, 'entities.dict'), delimiter='\t', names=["id", "entities"],
+                                   dtype=str)
         all_entities = pd.DataFrame(all_entities)
 
         return all_entities
 
     def load_relations(self, args):
         data_path = args.data_path
-        all_relations = pd.read_csv(os.path.join(data_path, 'relations.dict'), delimiter='\t', names=["id", "relations"],
-                                     dtype=str)
+        all_relations = pd.read_csv(os.path.join(data_path, 'relations.dict'), delimiter='\t',
+                                    names=["id", "relations"],
+                                    dtype=str)
         all_relations = pd.DataFrame(all_relations)
         return all_relations
 
@@ -1273,12 +1270,9 @@ class KGEModel(nn.Module):
             step = 0
             total_steps = sum([len(dataset) for dataset in test_dataset_list])
 
-            all_entities=model.load_entities(args)
-
+            all_entities = model.load_entities(args)
 
             all_relations = model.load_relations(args)
-
-
 
             with torch.no_grad():
                 for test_dataset in test_dataset_list:
@@ -1312,29 +1306,32 @@ class KGEModel(nn.Module):
                             positive_rel = positive_sample[:, 1]
                         else:
                             raise ValueError('mode %s not supported' % mode)
-                        ranked_triples=""
+                        ranked_triples = ""
                         for i in range(batch_size):
                             # Notice that argsort is not ranking
                             ranking = (argsort[i, :] == positive_arg[i]).nonzero()
                             assert ranking.size(0) == 1
                             # ranking + 1 is the true ranking used in evaluation metrics
                             ranking = 1 + ranking.item()
-
-                            if ranking <= 10 and args.do_test and mode == 'tail-batch' :
-                                if positive_rel[i].item() == 3 :  # 3= hasTypes
-                                    ranked_triples += str(ranking)+"\n"
-                                    entity = all_entities.at[int(positive_sample[:, 0][i].item()),"entities"]
-                                    ranked_triples += str(entity + "\t" + all_relations.at[int(positive_rel[i].item()),"relations"] + "\tlist[ ]\n")
-                                    tsize = argsort[i, :].size(0)
-                                    data = argsort[i, :]
-                                    rank = argsort[i, :].nonzero()
-                                    ranked_triples += "list= ["
-                                    for j in range(tsize):
-                                        entity_name = all_entities.at[int(data[j].item()),"entities"]
-                                        if entity_name in ("Education", "Government", "Company", "Facility","Healthcare","Nonprofit","Other"):
-                                            ranked_triples += str(str(entity_name) + "---" + str(int(rank[j].item())+1))+"\n"
-                                    ranked_triples +="]\n"
-                                    # print(ranked_triples)
+                            if ranking <= 10 and args.do_test and mode == 'tail-batch':
+                                # if positive_rel[i].item() == 3:  # 3= hasTypes
+                                ranked_triples += str(ranking) + "\n"
+                                entity = all_entities.at[int(positive_sample[:, 0][i].item()), "entities"]
+                                ranked_triples += str(entity + "\t" + all_relations.at[
+                                    int(positive_rel[i].item()), "relations"] + "\tlist[ ]\n")
+                                tsize = argsort[i, :].size(0)
+                                data = argsort[i, :]
+                                rank = argsort[i, :].nonzero()
+                                ranked_triples += "list= ["
+                                for j in range(tsize):
+                                    entity_name = all_entities.at[int(data[j].item()), "entities"]
+                                    if entity_name in (
+                                            "Education", "Government", "Company", "Facility", "Healthcare", "Nonprofit",
+                                            "Other"):
+                                        ranked_triples += str(
+                                            str(entity_name) + "---" + str(int(rank[j].item()) + 1)) + "\n"
+                                ranked_triples += "]\n"
+                                print(ranked_triples)
 
                             logs.append({
                                 'MRR': 1.0 / ranking,
@@ -1348,14 +1345,15 @@ class KGEModel(nn.Module):
 
                         step += 1
 
+                if args.do_test:
+                    print("Creating results")
+                    ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
+                    ranked_triple_file.write(ranked_triples)
+                    ranked_triple_file.close()
+
             metrics = {}
             for metric in logs[0].keys():
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
-            if args.do_test:
-                print("Creating results")
-                ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
-                ranked_triple_file.write(ranked_triples)
-                ranked_triple_file.close()
 
         return metrics
 
