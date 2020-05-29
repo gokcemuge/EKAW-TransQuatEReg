@@ -1344,7 +1344,7 @@ class KGEModel(nn.Module):
                         step += 1
 
                     if args.do_test:
-                        print("Creating results")
+                        print("Creating results of total :"+str(ranked_triples.count("\n"))+" lines")
                         ranked_triple_file = io.open("data/SD2020/ranked_result.txt", "a+", encoding="utf-8")
                         ranked_triple_file.write(ranked_triples)
                         ranked_triple_file.close()
