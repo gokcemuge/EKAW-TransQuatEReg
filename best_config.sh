@@ -1,3 +1,10 @@
+#Best config for 
+bash run.sh grid TransQuatE SD2020 2 0 256 50 4 1 0.1 16 -de
+bash run.sh grid TransE SD2020 2 0 256 50 4 1 0.1 16 -de
+bash run.sh grid RotatE SD2020 2 0 256 50 4 1 0.1 16 -de
+bash run.sh grid QuatE SD2020 2 0 256 50 4 1 0.1 16 -de
+
+
 # Best Configuration for RotatE
 #
 bash run.sh train RotatE FB15k 0 0 1024 256 1000 24.0 1.0 0.0001 150000 16 -de
