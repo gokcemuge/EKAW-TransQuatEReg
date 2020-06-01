@@ -1,4 +1,4 @@
-#Best config for 
+#Best config for AIDA DATASET
 bash run.sh grid TransQuatE SD2020 2 0 256 50 4 1 0.1 16 -de
 bash run.sh grid TransE SD2020 2 0 256 50 4 1 0.1 16 -de
 bash run.sh grid RotatE SD2020 2 0 256 50 4 1 0.1 16 -de
