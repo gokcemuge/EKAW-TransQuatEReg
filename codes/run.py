@@ -83,7 +83,7 @@ def parse_args(args=None):
     parser.add_argument('--adversarial', action='store_true', help='Use adversarial rule injection')
     parser.add_argument('--cuda', action='store_true', help='use GPU')
     parser.add_argument('--parallel', action='store_true', help='parallelize over several gpus')
-    parser.add_argument('--loss', default='quate') #uncertain_loss
+    parser.add_argument('--loss', default='uncertain_loss') #quate
     # parser.add_argument('--rules', action = 'store_true')
     parser.add_argument('--eq', action='store_true', help='use equality rules in training')
     parser.add_argument('--inv', action='store_true', help='use inverse rules in training')
