@@ -32,7 +32,7 @@ import dataloader as dt
 
 # LOSS_TMP = 'custom'
 OPT_STOPPING = False
-STEPS_BEFORE_VALID = 0  # number of steps to do before running on validation set
+STEPS_BEFORE_VALID = 1  # number of steps to do before running on validation set
 RULE_BATCH_SIZE_INV = 1000
 RULE_BATCH_SIZE_IMPL = 1000
 RULE_BATCH_SIZE_EQ = -1
