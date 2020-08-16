@@ -304,7 +304,7 @@ class KGEModel(nn.Module):
             mapping_reqularizer = torch.index_select(
                 self.mapping_reqularizer,
                 dim=0,
-                index=indices_heads) # TODO: check here later
+                index=indices_heads) # TODO: checked
 
             #entity_dict = {'mapping_reqularizer': mapping_reqularizer, 'head': head, 'tail': tail}
             return head, tail, mapping_reqularizer
@@ -337,6 +337,8 @@ class KGEModel(nn.Module):
 
             elif mode == 'head-batch':
                 tail_part, head_part = sample
+                #tail part has positive triples  h,r,t
+                #head_part has corrupted heads only h'X 10
                 batch_size, negative_sample_size = head_part.size(0), head_part.size(1)
 
                 head, tail, mapping_regularizer = self.entities_select(head_part.view(-1), tail_part[:, 2])
@@ -348,6 +350,9 @@ class KGEModel(nn.Module):
 
             elif mode == 'tail-batch':
                 head_part, tail_part = sample
+                # head_part has positive triples  h,r,t
+                # tail_part has corrupted tails only h'X 10
+
                 batch_size, negative_sample_size = tail_part.size(0), tail_part.size(1)
                 head, tail, mapping_regularizer = self.entities_select(head_part[:, 0], tail_part.view(-1))
                 head = head.unsqueeze(1)
@@ -688,7 +693,6 @@ class KGEModel(nn.Module):
         return score.sum(dim=2)
 
     def TransQuatEReg(self, head, rotator_head, mapping_regularizer, translation, tail):
-        # TODO: head-batch taiil-batch difference?
         head_real, head_i, head_j, head_k = torch.chunk(head, 4, dim=2)
         # print("head_real", head_real.shape)
         rot_h, rot_hi, rot_hj, rot_hk = self.normalize_quaternion(rotator_head)  # relationdan gelen bir rotation degree
@@ -719,9 +723,6 @@ class KGEModel(nn.Module):
         # print("mapping_regularizer_real", mapping_regularizer_real.shape)
 
         tail_real, tail_i, tail_j, tail_k = torch.chunk(tail, 4, dim=2)
-        # print("tail_real", tail_real.shape)
-        # TODO:Ask
-        # tail_i, tail_j, tail_k = -tail_i, -tail_j, -tail_k
 
         # rotating mapping_regularizer in 4 dim by tail
         # --- checked
@@ -1331,9 +1332,144 @@ class KGEModel(nn.Module):
 
     @staticmethod
     def test_step(model, test_triples, all_true_triples, args):
-        '''
-        Evaluate the model on test or valid datasets
-        '''
+
+        model.eval()
+
+        rank_file_name = str(model.model_name) +"_gamma"+ str(int(model.gamma.item()))+"_dim" + str(model.hidden_dim) +"_"+ str(model.training_start_time)
+        rank_file_loc = "data/SD2020/ranked_result_" + str(rank_file_name)+".txt"
+
+        #TODO: create new test function by removing head-bacthes
+        #test_dataloader_head = DataLoader(
+        #    TestDataset(
+        #        test_triples,
+        #        all_true_triples,
+        #        args.nentity,
+        #        args.nrelation,
+        #        'head-batch'
+        #    ),
+        #    batch_size=args.test_batch_size,
+        #    num_workers=max(1, args.cpu_num // 2),
+        #    collate_fn=TestDataset.collate_fn
+        #)
+
+        test_dataloader_tail = DataLoader(
+            TestDataset(
+                test_triples,
+                all_true_triples,
+                args.nentity,
+                args.nrelation,
+                'tail-batch'
+            ),
+            batch_size=args.test_batch_size,
+            num_workers=max(1, args.cpu_num // 2),
+            collate_fn=TestDataset.collate_fn
+        )
+
+        #test_dataset_list = [test_dataloader_head, test_dataloader_tail]
+        test_dataset_list = [test_dataloader_tail]
+
+        logs = []
+
+        step = 0
+        total_steps = sum([len(dataset) for dataset in test_dataset_list])
+
+        all_entities = model.load_entities(args)
+
+        # h r t?
+
+        all_relations = model.load_relations(args)
+
+        with torch.no_grad():
+            for test_dataset in test_dataset_list:
+                for idx, positive_sample, negative_sample, filter_bias, mode in test_dataset:
+                    # negative samples are corrupted heads or tails depends on mode
+                    if args.cuda:
+                        positive_sample = positive_sample.cuda()
+                        #here
+                        #print("positive sample(h_r_t)", positive_sample.size()) ([16, 3])
+                        negative_sample = negative_sample.cuda()
+                        #print("negative sample(tails)", negative_sample.size()) [16, 68907])
+                        filter_bias = filter_bias.cuda()
+
+                    batch_size = positive_sample.size(0)
+
+                    score = model(idx, (positive_sample, negative_sample), mode)
+                    # all the pos and neg samples score
+                    if model.loss_name == 'quate':
+                        score = -score
+                    elif model.model_name != 'ComplEx':
+                        score = model.gamma.item() - score
+                    score += filter_bias
+                    # Explicitly sort all the entities to ensure that there is no test exposure bias
+                    argsort = torch.argsort(score, dim=1, descending=True) #returns index after sort
+
+                    if mode == 'head-batch':
+
+                        positive_arg = positive_sample[:, 0] # get the positive head
+                        #positive_rel = positive_sample[:, 1]
+
+                    elif mode == 'tail-batch':
+
+                        positive_arg = positive_sample[:, 2] # get the positive tail
+                        #positive_rel = positive_sample[:, 1]
+                    else:
+                        raise ValueError('mode %s not supported' % mode)
+                    ranked_triples = ""
+                    for i in range(batch_size):
+                        # Notice that argsort is not ranking
+                        ranking = (argsort[i, :] == positive_arg[i]).nonzero()
+                        assert ranking.size(0) == 1
+                        # ranking + 1 is the true ranking used in evaluation metrics
+                        ranking = 1 + ranking.item()
+
+                        '''
+                        if  args.do_test and  str(all_relations.at[int(positive_rel[
+                                                        i].item()), "relations"]) == "hasTypes"  and mode == 'tail-batch' :
+                            # if positive_rel[i].item() == 3:  # 3= hasTypes ranking <= 10 and and args.do_test
+                            ranked_triples += str(ranking) + "\n"
+                            entity = all_entities.at[int(positive_sample[:, 0][i].item()), "entities"]
+                            ranked_triples += str(entity + "\t" + all_relations.at[
+                                int(positive_rel[i].item()), "relations"] + "\tlist[ ]\n")
+                            tsize = argsort[i, :].size(0)
+                            data = argsort[i, :]
+                            rank = argsort[i, :].nonzero()
+                            ranked_triples += "list= ["
+                            for j in range(tsize):
+                                entity_name = all_entities.at[int(data[j].item()), "entities"]
+                                if entity_name in ("Education", "Government", "Company", "Facility"):
+                                    ranked_triples += str(
+                                        str(entity_name) + "---" + str(int(rank[j].item()) + 1)) + "\n"
+                            ranked_triples += "]\n"
+                        '''
+                        logs.append({
+                            'MRR': 1.0 / ranking,
+                            'MR': float(ranking),
+                            'HITS@1': 1.0 if ranking <= 1 else 0.0,
+                            'HITS@3': 1.0 if ranking <= 3 else 0.0,
+                            'HITS@10': 1.0 if ranking <= 10 else 0.0,
+                        })
+                    if step % args.test_log_steps == 0:
+                        logging.info('Evaluating the model... (%d/%d)' % (step, total_steps))
+                    step += 1
+
+                    #if args.do_test:
+                        #print("Creating results of total :"+str(ranked_triples.count("\n"))+" lines")
+                        #ranked_triple_file = io.open(rank_file_loc, "a+", encoding="utf-8")
+                        #ranked_triple_file.write(ranked_triples)
+                        #ranked_triple_file.close()
+        metrics = {}
+        for metric in logs[0].keys():
+            metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
+
+        return metrics
+
+
+    '''
+    @staticmethod
+    def test_step(model, test_triples, all_true_triples, args):
+        
+        #Evaluate the model on test or valid datasets
+        
 
         model.eval()
 
@@ -1368,6 +1504,8 @@ class KGEModel(nn.Module):
             # Otherwise use standard (filtered) MRR, MR, HITS@1, HITS@3, and HITS@10 metrics
             # Prepare dataloader for evaluation
 
+
+            #TODO: create new test function by removing head-bacthes
             test_dataloader_head = DataLoader(
                 TestDataset(
                     test_triples,
@@ -1403,12 +1541,14 @@ class KGEModel(nn.Module):
 
             all_entities = model.load_entities(args)
 
+            # h r t?
+
             all_relations = model.load_relations(args)
 
             with torch.no_grad():
                 for test_dataset in test_dataset_list:
                     for idx, positive_sample, negative_sample, filter_bias, mode in test_dataset:
-
+                        # negative samples are corrupted heads or tails depends on mode
                         if args.cuda:
                             positive_sample = positive_sample.cuda()
                             negative_sample = negative_sample.cuda()
@@ -1424,7 +1564,7 @@ class KGEModel(nn.Module):
                             score = model.gamma.item() - score
                         score += filter_bias
                         # Explicitly sort all the entities to ensure that there is no test exposure bias
-                        argsort = torch.argsort(score, dim=1, descending=True)
+                        argsort = torch.argsort(score, dim=1, descending=True) #returns index after sort
 
                         if mode == 'head-batch':
 
@@ -1484,29 +1624,4 @@ class KGEModel(nn.Module):
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
 
         return metrics
-
-
-'''
-
-        negative_score = model.gamma2 - negative_score                # model.gamma - negative_score
-
-        if args.negative_adversarial_sampling:
-            #In self-adversarial sampling, we do not apply back-propagation on the sampling weight
-            negative_score = (F.softmax(negative_score * args.adversarial_temperature, dim = 1).detach()
-                              * F.relu(negative_score)).sum(dim = 1)
-        else:
-            negative_score = F.relu(negative_score).mean(dim = 1)
-
-
-        positive_score = model.gamma1 - positive_score                # model.gamma - positive_score
-        positive_score = F.relu(-positive_score).squeeze(dim = 1)
-
-        if args.uni_weight:
-            positive_sample_loss = positive_score.mean()
-            negative_sample_loss = negative_score.mean()
-        else:
-            positive_sample_loss = (subsampling_weight * positive_score).sum()/subsampling_weight.sum()
-            negative_sample_loss = (subsampling_weight * negative_score).sum()/subsampling_weight.sum()
-
-        loss = (positive_sample_loss + negative_sample_loss)/2
-'''
+    '''

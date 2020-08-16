@@ -45,8 +45,8 @@ then
     -b $BATCH_SIZE -d $HIDDEN_DIM \
     -g $GAMMA -a $ALPHA -adv \
     -lr $LEARNING_RATE \
-    --log_steps 5000 \
-    --valid_steps 200000 \
+    --log_steps 500 \
+    --valid_steps 10000 \
     -save $SAVE --test_batch_size $TEST_BATCH_SIZE \
     ${12} ${13} ${14} ${15}
 
