@@ -655,23 +655,23 @@ class KGEModel(nn.Module):
         rotated_head_j = h * rj - hi * rk + hj * r + hk * ri
         rotated_head_k = h * rk + hi * rj - hj * ri + hk * r
 
-        #score = rotated_head_real * t + rotated_head_i * ti + rotated_head_j * tj + rotated_head_k * tk
+        score = rotated_head_real * t + rotated_head_i * ti + rotated_head_j * tj + rotated_head_k * tk
         # regul1 = torch.mean(h**2) + torch.mean(hi**2) + torch.mean(hj**2) + torch.mean(hk**2) + \
         #         torch.mean(t**2) + torch.mean(ti**2) + torch.mean(tj**2) + torch.mean(tk**2)
 
         # regul2 = torch.mean(r**2) + torch.mean(ri**2) + torch.mean(rj**2) + torch.mean(rk**2)
 
-        #score = torch.sum(score, -1)
-        #return score
+        score = torch.sum(score, -1)
+        return score
         # TODO: check here
-        score_r = rotated_head_real * t
-        score_i = rotated_head_i * ti
-        score_j = rotated_head_j * tj
-        score_k = rotated_head_k * tk
+        #score_r = rotated_head_real * t
+        #score_i = rotated_head_i * ti
+        #score_j = rotated_head_j * tj
+        #score_k = rotated_head_k * tk
 
-        score = torch.stack([score_r, score_i, score_j, score_k], dim=0)
-        score = score.norm(dim=0)
-        return score.sum(dim=2)
+        #score = torch.stack([score_r, score_i, score_j, score_k], dim=0)
+        #score = score.norm(dim=0)
+        #return score.sum(dim=2)
 
     def TransQuatE(self, head, rotator_head, rotator_tail, translation, tail):
         head, head_i, head_j, head_k = torch.chunk(head, 4, dim=2)
