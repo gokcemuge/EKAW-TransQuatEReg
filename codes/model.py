@@ -38,12 +38,12 @@ PROJECT_SPHERE = False
 class KGEModel(nn.Module):
     def __init__(self, model_name, nentity, nrelation, ntriples, hidden_dim, args):
         super(KGEModel, self).__init__()
-        '''
+
         if L2:
             print('L2 regul with coeff ', L2_COEFF)
         if L1:
             print('L1 regul with coeff ', L2_COEFF)
-        '''
+
 
         self.training_start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M')
         self.model_name = model_name
@@ -64,20 +64,6 @@ class KGEModel(nn.Module):
         self.embedding_range = nn.Parameter(
             torch.Tensor([(self.gamma.item() + self.epsilon) / hidden_dim]),
             requires_grad=False
-        )
-
-        self.xi = nn.Parameter(torch.zeros(ntriples, 1))
-        nn.init.uniform_(
-            tensor=self.xi,
-            a=-0.1,
-            b=0.1
-        )
-
-        self.xi_neg = nn.Parameter(torch.zeros(ntriples, 1))
-        nn.init.uniform_(
-            tensor=self.xi_neg,
-            a=-0.1,
-            b=0.1
         )
 
         ent_dim_mult, rel_dim_mult = self.compute_multipliers()
