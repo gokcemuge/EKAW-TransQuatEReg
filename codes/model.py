@@ -66,19 +66,19 @@ class KGEModel(nn.Module):
             requires_grad=False
         )
 
-        self.xi = nn.Parameter(torch.zeros(ntriples, 1))
-        nn.init.uniform_(
-            tensor=self.xi,
-            a=-0.1,
-            b=0.1
-        )
+        #self.xi = nn.Parameter(torch.zeros(ntriples, 1))
+        #nn.init.uniform_(
+        #    tensor=self.xi,
+        #    a=-0.1,
+        #    b=0.1
+        #)
 
-        self.xi_neg = nn.Parameter(torch.zeros(ntriples, 1))
-        nn.init.uniform_(
-            tensor=self.xi_neg,
-            a=-0.1,
-            b=0.1
-        )
+        #self.xi_neg = nn.Parameter(torch.zeros(ntriples, 1))
+        #nn.init.uniform_(
+        #    tensor=self.xi_neg,
+        #    a=-0.1,
+        #    b=0.1
+        #)
 
         ent_dim_mult, rel_dim_mult = self.compute_multipliers()
 
@@ -105,9 +105,9 @@ class KGEModel(nn.Module):
         if self.model_name in ['TransQuatEReg']:
             mult = 4 if 'Quat' in self.model_name else 1
             self.rotator_head = nn.Parameter(torch.zeros(nrelation, mult * hidden_dim))
-            self.mapping_reqularizer = nn.Parameter(torch.zeros(nentity, mult * hidden_dim))
+            self.mapping_regularizer = nn.Parameter(torch.zeros(nentity, mult * hidden_dim))
             self.initialize(self.rotator_head, nrelation, hidden_dim)
-            self.initialize(self.mapping_reqularizer, nentity, hidden_dim)
+            self.initialize(self.mapping_regularizer, nentity, hidden_dim)
 
 
         # set rule info
@@ -301,13 +301,13 @@ class KGEModel(nn.Module):
             index=indices_tails)
 
         if self.model_name in ['TransQuatEReg']:
-            mapping_reqularizer = torch.index_select(
-                self.mapping_reqularizer,
+            mapping_regularizer = torch.index_select(
+                self.mapping_regularizer,
                 dim=0,
                 index=indices_heads) # TODO: checked
 
             #entity_dict = {'mapping_reqularizer': mapping_reqularizer, 'head': head, 'tail': tail}
-            return head, tail, mapping_reqularizer
+            return head, tail, mapping_regularizer
 
         return head, tail
 
@@ -655,13 +655,23 @@ class KGEModel(nn.Module):
         rotated_head_j = h * rj - hi * rk + hj * r + hk * ri
         rotated_head_k = h * rk + hi * rj - hj * ri + hk * r
 
-        score = rotated_head_real * t + rotated_head_i * ti + rotated_head_j * tj + rotated_head_k * tk
+        #score = rotated_head_real * t + rotated_head_i * ti + rotated_head_j * tj + rotated_head_k * tk
         # regul1 = torch.mean(h**2) + torch.mean(hi**2) + torch.mean(hj**2) + torch.mean(hk**2) + \
         #         torch.mean(t**2) + torch.mean(ti**2) + torch.mean(tj**2) + torch.mean(tk**2)
 
         # regul2 = torch.mean(r**2) + torch.mean(ri**2) + torch.mean(rj**2) + torch.mean(rk**2)
-        score = torch.sum(score, -1)
-        return score
+
+        #score = torch.sum(score, -1)
+        #return score
+        # TODO: check here
+        score_r = rotated_head_real * t
+        score_i = rotated_head_i * ti
+        score_j = rotated_head_j * tj
+        score_k = rotated_head_k * tk
+
+        score = torch.stack([score_r, score_i, score_j, score_k], dim=0)
+        score = score.norm(dim=0)
+        return score.sum(dim=2)
 
     def TransQuatE(self, head, rotator_head, rotator_tail, translation, tail):
         head, head_i, head_j, head_k = torch.chunk(head, 4, dim=2)
@@ -870,6 +880,13 @@ class KGEModel(nn.Module):
         positive_score = positive_score.squeeze()
         # print('positive score - ', positive_score)
         # print('negative score - ', negative_score)
+
+        # regul1 = torch.mean(h**2) + torch.mean(hi**2) + torch.mean(hj**2) + torch.mean(hk**2) + \
+        #         torch.mean(t**2) + torch.mean(ti**2) + torch.mean(tj**2) + torch.mean(tk**2)
+
+        # regul2 = torch.mean(r**2) + torch.mean(ri**2) + torch.mean(rj**2) + torch.mean(rk**2)
+
+
         negative_loss = torch.mean(self.criterion(-negative_score))
         positive_loss = torch.mean(self.criterion(positive_score))
 
@@ -882,7 +899,7 @@ class KGEModel(nn.Module):
         if self.model_name != 'ComplEx':
             negative_score = self.gamma.item() - negative_score
             positive_score = self.gamma.item() - positive_score
-
+        #TODO: quate ise regularizerla topla burda test yap sonra
         if args.negative_adversarial_sampling:
             # In self-adversarial sampling, we do not apply back-propagation on the sampling weight
             negative_score = (F.softmax(negative_score * args.adversarial_temperature, dim=1).detach()
@@ -1131,11 +1148,14 @@ class KGEModel(nn.Module):
             nan4 = torch.isnan(model.rotator_tail.grad).sum()
         if model.model_name in ['sTransRotatE', 'sTransQuatE']:
             nan3 = torch.isnan(model.rotator_head.grad).sum()
+        if model.model_name in ['TransQuatEReg']:
+            nan3 = torch.isnan(model.rotator_head.grad).sum()
+            nan4 = torch.isnan(model.mapping_regularizer.grad).sum()
 
         if nan1 != 0: print(nan1.item(), ' nan vals in entity grads')
         if nan2 != 0: print(nan2.item(), ' nan vals in relation  grad')
         if nan3 != 0: print(nan3.item(), ' nan vals in rotator')
-        if nan4 != 0: print(nan4.item(), ' nan vals in rotator tail')
+        if nan4 != 0: print(nan4.item(), ' nan vals in rotator/mapping reg')
         if nan1 + nan2 + nan3 + nan4 != 0: exit()
 
     @staticmethod
