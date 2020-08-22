@@ -40,7 +40,7 @@ RULE_BATCH_SIZE_SYM = -1
 GAMMA1 = [23]
 GAMMA2 = [25]
 N_NEGS_LIST = [10]
-N_STEPS_LIST = [200000]
+N_STEPS_LIST = [50000]
 # test next on [150000, 220000]
 
 # rules settings
@@ -357,26 +357,16 @@ def train_model(init_step, valid_triples, all_true_triples, kge_model, adv_model
                 # logging.info('N adversarial errors per adv epoch: {}, {}'.format(errors[0], errors[-1]))
             training_logs = []
 
-        if args.do_valid and step % args.valid_steps == 0 and step >= STEPS_BEFORE_VALID:
-            logging.info('Evaluating on Valid Dataset...')
-            model_module = kge_model.module if args.parallel else kge_model
-            metrics = model_module.test_step(model_module, valid_triples, all_true_triples, args)
-            log_metrics('Valid', step, metrics)
-            if args.do_grid:
-                info = 'Validation (%d): ' % step
-                for key, val in metrics.items():
-                    info = info + key + ' - ' + str(val) + ';'
-                print(info)
-            '''if metrics['HITS@10'] - prev_hit10 < epsilon and OPT_STOPPING:
-                if step <= 5/6*args.max_steps:
-                    current_learning_rate = current_learning_rate / 10
-                    logging.info('Change learning_rate to %f at step %d' % (current_learning_rate, step))
-                    optimizer = optim_fnc(
-                        filter(lambda p: p.requires_grad, kge_model.parameters()),
-                        lr=current_learning_rate
-                    )
-                else: break
-            prev_hit10 = metrics['HITS@10']'''
+        #if args.do_valid and step % args.valid_steps == 0 and step >= STEPS_BEFORE_VALID:
+        #    logging.info('Evaluating on Valid Dataset...')
+        #    model_module = kge_model.module if args.parallel else kge_model
+        #    metrics = model_module.test_step(model_module, valid_triples, all_true_triples, args)
+        #    log_metrics('Valid', step, metrics)
+        #    if args.do_grid:
+        #        info = 'Validation (%d): ' % step
+        #        for key, val in metrics.items():
+        #            info = info + key + ' - ' + str(val) + ';'
+        #        print(info)
 
     save_variable_list = {
         'step': step,
@@ -464,13 +454,6 @@ def print_rules_info(model, args):
 def run_grid(nentity, nrelation, train_triples,
              valid_triples, test_triples, all_true_triples, args, rule_iterators=None, adv_model=None):
     ntriples = len(train_triples)
-    if args.inject:
-        print('injecting rules')
-    else:
-        print('rules not injected')
-
-    if args.ruge:
-        print('Using RUGE injection model')
 
     reset_empty_values(args)
     current_learning_rate = args.learning_rate
@@ -487,103 +470,78 @@ def run_grid(nentity, nrelation, train_triples,
     print(info2)
 
     current_learning_rate = args.learning_rate
-    EPSILONS = itertools.product(EPSILONS_INV, EPSILONS_IMPL, EPSILONS_SYM, EPSILONS_EQ)
-    WEIGHTS = itertools.product(WEIGHTS_INV, WEIGHTS_IMPL, WEIGHTS_SYM, WEIGHTS_EQ)
-
     idx = -1  # for saving models with several parameters
-    for g1, g2 in zip(GAMMA1, GAMMA2):
-        for eps_inv, eps_impl, eps_sym, eps_eq in EPSILONS:
-            for w_inv, w_impl, w_sym, w_eq in WEIGHTS:
-                for dim, n_negs, steps in itertools.product(DIMENSIONS, N_NEGS_LIST, N_STEPS_LIST):
-                    idx += 1
-                    # re-initialize the model
-                    kge_model = KGEModel(
-                        model_name=args.model,
-                        nentity=nentity,
-                        nrelation=nrelation,
-                        ntriples=ntriples,
-                        hidden_dim=dim,
-                        args=args
-                    )
-                    if 'inverse' in RULE_TYPES:
-                        kge_model.rule_weight['inverse'] = w_inv
-                        kge_model.epsilon_inv = eps_inv
-                    if 'implication' in RULE_TYPES:
-                        kge_model.rule_weight['implication'] = w_impl
-                        kge_model.epsilon_impl = eps_impl
-                    if 'symmetry' in RULE_TYPES:
-                        kge_model.rule_weight['symmetry'] = w_sym
-                        kge_model.epsilon_sym = eps_sym
-                    if 'equality' in RULE_TYPES:
-                        kge_model.rule_weight['equality'] = w_eq
-                        kge_model.epsilon_eq = eps_eq
 
-                    kge_model.set_loss(args.loss)
-                    logging.info('Model: %s' % args.model)
-                    logging.info('Data Path: %s' % args.data_path)
-                    logging.info('#entity: %d' % nentity)
-                    logging.info('#relation: %d' % nrelation)
-                    logging.info('optimizer: %s' % args.opt)
-                    logging.info('learning rate: %f' % current_learning_rate)
-                    logging.info('loss: %s' % args.loss)
-                    if args.inv:
-                        logging.info('using inverse rules: eps = %f, weight = %f' % (
-                            kge_model.epsilon_inv, kge_model.rule_weight['inverse']))
-                    if args.impl:
-                        logging.info('using implication rules: eps = %f, weight = %f' % (
-                            kge_model.epsilon_impl, kge_model.rule_weight['implication']))
-                    if args.sym:
-                        logging.info('using symmetry rules: eps = %f, weight = %f' % (
-                            kge_model.epsilon_sym, kge_model.rule_weight['symmetry']))
-                    if args.eq:
-                        logging.info('using equality rules: eps = %f, weight = %f' % (
-                            kge_model.epsilon_eq, kge_model.rule_weight['equality']))
-                    logging.info('Model Parameter Configuration:')
-                    for name, param in kge_model.named_parameters():
-                        logging.info(
-                            'Parameter %s: %s, require_grad = %s' % (name, str(param.size()), str(param.requires_grad)))
-                    logging.info('Loss function %s' % args.loss)
-                    if args.cuda:
-                        kge_model = kge_model.cuda()
+    for dim, n_negs, steps in itertools.product(DIMENSIONS, N_NEGS_LIST, N_STEPS_LIST):
+            idx += 1
+            # re-initialize the model
+            kge_model = KGEModel(
+                model_name=args.model,
+                nentity=nentity,
+                nrelation=nrelation,
+                ntriples=ntriples,
+                hidden_dim=dim,
+                args=args
+            )
 
-                    logging.info('Ramdomly Initializing %s Model...' % args.model)
+            kge_model.set_loss(args.loss)
+            logging.info('Model: %s' % args.model)
+            logging.info('Data Path: %s' % args.data_path)
+            logging.info('#entity: %d' % nentity)
+            logging.info('#relation: %d' % nrelation)
+            logging.info('optimizer: %s' % args.opt)
+            logging.info('learning rate: %f' % current_learning_rate)
+            logging.info('loss: %s' % args.loss)
 
-                    print_rules_info(kge_model, args)
-                    args.max_steps = steps
-                    args.negative_sample_size = n_negs
-                    # out_line = '#steps = {}, #negs = {};'.format(args.max_steps, args.negative_sample_size)
-                    logging.info('Max steps - %d' % args.max_steps)
-                    logging.info('Negative sample %d ' % args.negative_sample_size)
-                    assert kge_model.inject == args.inject, 'Inject is wrong'
-                    # train
+            logging.info('Model Parameter Configuration:')
+            for name, param in kge_model.named_parameters():
+                logging.info(
+                    'Parameter %s: %s, require_grad = %s' % (name, str(param.size()), str(param.requires_grad)))
+            logging.info('Loss function %s' % args.loss)
+            if args.cuda:
+                kge_model = kge_model.cuda()
 
-                    train_iterator = construct_dataloader(args, train_triples, nentity, nrelation)
-                    step = train_model(0, valid_triples, all_true_triples, kge_model, adv_model, train_iterator,
-                                       rule_iterators, args, str(idx))
-                    # valid
-                    logging.info('Evaluating on Valid Dataset...')
+            logging.info('Randomly Initializing %s Model...' % args.model)
 
-                    metrics = kge_model.test_step(kge_model, valid_triples, all_true_triples, args)
-                    log_metrics('Valid', step, metrics)
-                    info = 'Validation (%d): ' % step
-                    for key, val in metrics.items():
-                        info = info + key + ' - ' + str(val) + ';'
-                    print(info)
-                    # test
+            print_rules_info(kge_model, args)
+            args.max_steps = steps
+            args.negative_sample_size = n_negs
+            # out_line = '#steps = {}, #negs = {};'.format(args.max_steps, args.negative_sample_size)
+            logging.info('Max steps - %d' % args.max_steps)
+            logging.info('Negative sample %d ' % args.negative_sample_size)
+            assert kge_model.inject == args.inject, 'Inject is wrong'
 
-                    out_line = '#steps = {}, #negs = {}, dim = {};'.format(step, args.negative_sample_size,
-                                                                           kge_model.hidden_dim)
-                    args.do_test=True
-                    metrics = kge_model.test_step(kge_model, test_triples, all_true_triples, args)
-                    args.do_test = False
-                    log_metrics('Test', step, metrics)
+            # TRAINING
+            train_iterator = construct_dataloader(args, train_triples, nentity, nrelation)
+            step = train_model(0, valid_triples, all_true_triples, kge_model, adv_model, train_iterator,
+                               rule_iterators, args, str(idx))
 
-                    values = ["MRR: "+str(metrics['MRR']), "MR: "+str(metrics['MR']), "HITS@1: "+str(metrics['HITS@1']), "HITS@3: "+str(metrics['HITS@3']),
-                              "HITS@10: "+str(metrics['HITS@10'])]
-                    out_line = out_line + ';'.join(values)
-                    print(out_line)
-                    logging.info('\n-----------------------------------------------')
-            print()
+            # VALIDATION
+            #logging.info('Evaluating on Valid Dataset...')
+
+            #metrics = kge_model.test_step(kge_model, valid_triples, all_true_triples, args)
+            #log_metrics('Valid', step, metrics)
+            #info = 'Validation (%d): ' % step
+            #for key, val in metrics.items():
+            #    info = info + key + ' - ' + str(val) + ';'
+            #print(info)
+
+            # TEST
+            out_line = '#steps = {}, #negs = {}, dim = {};'.format(step, args.negative_sample_size,
+                                                                   kge_model.hidden_dim)
+            args.do_test = True
+            metrics = kge_model.test_step(kge_model, test_triples, all_true_triples, args)
+            args.do_test = False
+            log_metrics('Test', step, metrics)
+
+            values = ["MRR: "+str(metrics['MRR']), "MR: "+str(metrics['MR']), "HITS@1: "+str(metrics['HITS@1']), "HITS@3: "+str(metrics['HITS@3']),
+                      "HITS@10: "+str(metrics['HITS@10'])]
+            print(out_line)
+            out_line2 = "" + ';'.join(values)
+            print(out_line2)
+            logging.info('\n-----------------------------------------------')
+
+    print()
 
 
 def read_ruleset_ruge(data_path, rule_type, premise_idx, concl_idx):
@@ -708,21 +666,12 @@ def main(args):
             rid, relation = line.strip().split('\t')
             relation2id[relation] = int(rid)
 
-    # Read regions for Countries S* datasets
-    if args.countries:
-        regions = list()
-        with open(os.path.join(args.data_path, 'regions.list')) as fin:
-            for line in fin:
-                region = line.strip()
-                regions.append(entity2id[region])
-        args.regions = regions
 
     nentity = len(entity2id)
     nrelation = len(relation2id)
 
     args.nentity = nentity
     args.nrelation = nrelation
-
 
     if args.inject:
         logging.info('With rule injection')
@@ -747,270 +696,19 @@ def main(args):
 
     # set up rule iterators
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    print("is cuda available? ", torch.cuda.is_available())
     n_batches = len(train_triples) // args.batch_size
     if n_batches < len(train_triples) / args.batch_size: n_batches += 1
-    rule_iterators = {}
-    rules_info = ''
-    if args.inv:
-        n_inverse, inverse_batchsize, rule_iterators['inverse'] = setup_rule_loader(n_batches, args.batch_size,
-                                                                                    args.data_path,
-                                                                                    'groundings_inverse.txt', device,
-                                                                                    RULE_BATCH_SIZE_INV)
-        rules_info += 'Inverse: batch size %d out of %d rules' % (inverse_batchsize, n_inverse) + '\n'
-    if args.eq:
-        n_eq, eq_batchsize, rule_iterators['equality'] = setup_rule_loader(n_batches, args.batch_size, args.data_path,
-                                                                           'groundings_equality.txt', device,
-                                                                           RULE_BATCH_SIZE_EQ)
-        rules_info += 'Equality: batch size %d out of %d rules' % (eq_batchsize, n_eq) + '\n'
-    if args.impl:
-        n_impl, impl_batchsize, rule_iterators['implication'] = setup_rule_loader(n_batches, args.batch_size,
-                                                                                  args.data_path,
-                                                                                  'groundings_implication.txt', device,
-                                                                                  RULE_BATCH_SIZE_IMPL)
-        rules_info += 'implication: batch size %d out of %d rules\n' % (impl_batchsize, n_impl)
-    if args.sym:
-        n_symmetry, sym_batchsize, rule_iterators['symmetry'] = setup_rule_loader(n_batches, args.batch_size,
-                                                                                  args.data_path,
-                                                                                  'groundings_symmetric.txt', device,
-                                                                                  RULE_BATCH_SIZE_SYM)
-        rules_info += 'symmetry: batch size %d out of %d rules\n' % (sym_batchsize, n_symmetry)
-    if args.ruge or args.ruge_inject:
-        n_rules, rule_iterators['ruge'] = construct_ruge_loader(n_batches, args)
-        rules_info += 'RUGE: Total %d rules\n' % n_rules
 
-    if rules_info:
-        logging.info(rules_info)
-
-    # ----------- adversarial ------------------
-    if args.adversarial:
-        clauses_filename = os.path.join(args.data_path, 'clauses_0.9.pl')
-        adv_clauses, clentity2id = dt.read_clauses(clauses_filename, relation2id)
-        n_clause_entities = len(clentity2id)
-        mult = 2
-        if args.model in ['TransE', 'pRotatE']: mult = 1
-        if 'QuatE' in args.model: mult = 4
-        adv_model = ADVModel(
-            clauses=adv_clauses,
-            n_entities=len(clentity2id),
-            dim=mult * args.hidden_dim,
-            use_cuda=args.cuda
-        )
-        if args.cuda:
-            adv_model = adv_model.cuda()
-    else:
-        adv_model = None
-
+    adv_model = None
     if args.do_grid:
-        if rules_info:
-            print(rules_info)
+        rule_iterators = None
         run_grid(nentity, nrelation, train_triples, valid_triples, test_triples, all_true_triples, args, rule_iterators,
                  adv_model)
         exit()
-    ntriples = len(train_triples)
-    kge_model = KGEModel(
-        model_name=args.model,
-        nentity=nentity,
-        nrelation=nrelation,
-        ntriples=ntriples,
-        hidden_dim=args.hidden_dim,
-        gamma=args.gamma,
-        # gamma1 = 0,
-        # gamma2 = 0,
-        # double_entity_embedding=args.double_entity_embedding,
-        # double_relation_embedding=args.double_relation_embedding
-    )
-    kge_model.set_loss(args.loss)
-
-    logging.info('Model Parameter Configuration:')
-    for name, param in kge_model.named_parameters():
-        logging.info('Parameter %s: %s, require_grad = %s' % (name, str(param.size()), str(param.requires_grad)))
-    logging.info('Loss function %s' % args.loss)
-    if args.cuda and args.parallel:
-        gpus = [0, 1]
-        os.environ['CUDA_VISIBLE_DEVICES'] = ','.join(str(x) for x in gpus)
-        kge_model.cuda()
-        kge_model = torch.nn.DataParallel(kge_model, device_ids=[0, 1])
-
-    elif args.cuda:
-        kge_model = kge_model.cuda()
-
-    if args.do_train or args.do_experiment:
-        # Set training dataloader iterator
-        train_dataloader_head = DataLoader(
-            TrainDataset(train_triples, nentity, nrelation, args.negative_sample_size, 'head-batch'),
-            batch_size=args.batch_size,
-            shuffle=True,
-            num_workers=max(1, args.cpu_num // 2),
-            collate_fn=TrainDataset.collate_fn
-        )
-
-        train_dataloader_tail = DataLoader(
-            TrainDataset(train_triples, nentity, nrelation, args.negative_sample_size, 'tail-batch'),
-            batch_size=args.batch_size,
-            shuffle=True,
-            num_workers=max(1, args.cpu_num // 2),
-            collate_fn=TrainDataset.collate_fn
-        )
-
-        train_iterator = BidirectionalOneShotIterator(train_dataloader_head, train_dataloader_tail)
-
-        # Set training configuration
-        current_learning_rate = args.learning_rate
-        optimizer = torch.optim.Adam(
-            filter(lambda p: p.requires_grad, kge_model.parameters()),
-            lr=current_learning_rate
-        )
-        '''if args.warm_up_steps:
-                                    warm_up_steps = args.warm_up_steps
-                                else:
-                                    warm_up_steps = args.max_steps // 2'''
-
-    '''if args.do_grid:
-                    # Set training configuration
-                    current_learning_rate = args.learning_rate
-                    optimizer = torch.optim.Adam(
-                        filter(lambda p: p.requires_grad, kge_model.parameters()),
-                        lr=current_learning_rate
-                    )
-    '''
-    if args.init_checkpoint:
-        # Restore model from checkpoint directory
-        logging.info('Loading checkpoint %s...' % args.init_checkpoint)
-        checkpoint = torch.load(os.path.join(args.init_checkpoint, 'checkpoint'))
-        init_step = checkpoint['step']
-        kge_model.load_state_dict(checkpoint['model_state_dict'])
-        if args.do_train:
-            current_learning_rate = checkpoint['current_learning_rate']
-            warm_up_steps = checkpoint['warm_up_steps']
-            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-    else:
-        logging.info('Ramdomly Initializing %s Model...' % args.model)
-        init_step = 0
-
-    step = init_step
-
-    '''if args.do_grid:
-        # setup logging
-        print('init_step = %d' % init_step)
-        print('learning_rate = %d' % current_learning_rate)
-        print('batch_size = %d' % args.batch_size)
-        print('negative_adversarial_sampling = %d' % args.negative_adversarial_sampling)
-        print('hidden_dim = %d' % args.hidden_dim)
-        print('negative_adversarial_sampling = %s' % str(args.negative_adversarial_sampling))
-        if args.negative_adversarial_sampling:
-            print('adversarial_temperature = %f' % args.adversarial_temperature)
-
-
-        # Set valid dataloader as it would be evaluated during training
-
-        print('GRID TESTING\nUsing new loss function')
-        gamma1 = [.1, .3, 1., 24.]
-        gamma2 = [.2, .4, 2., 25.]
-        n_negs = [10, 100, 200]
-        n_steps = [150000, 200000, 250000]
-        for opt in ['adam', 'ada']:
-            args.opt = opt
-            for g1, g2 in zip(gamma1, gamma2):
-                for n_neg in n_negs:
-                    for steps in n_steps:
-                        args.max_steps = steps
-                        kge_model.gamma1 = g1; kge_model.gamma2 = g2
-                        args.negative_sample_size = n_neg
-                        print("OPTIMIZER: ", opt)
-                        print('GAMMA1 = ', kge_model.gamma1)
-                        print('GAMMA2 = ', kge_model.gamma2)
-                        print('N STEPS - ', steps)
-                        print('negative sample - ', args.negative_sample_size)
-
-                        train_iterator = construct_dataloader(args, train_triples, nentity, nrelation)
-                        grid_train_model(init_step, valid_triples, all_true_triples, kge_model, train_iterator, args)
-                        metrics = kge_model.test_step(kge_model, test_triples, all_true_triples, args)
-                        log_metrics('Test', step, metrics)
-                        print('TEST')
-                        for k, val in metrics.items():
-                            print(k, ' : ', val)
-                        print('-------------------------------------------------------')
-                        print()
-                    print()
-            print('-------------------------------')
-
-            n_steps = [250000, 350000, 400000, 500000]
-        exit()
-    '''
-    logging.info('Start Training...')
-    logging.info('init_step = %d' % init_step)
-    logging.info('learning_rate = %d' % current_learning_rate)
-    logging.info('batch_size = %d' % args.batch_size)
-    logging.info('negative_adversarial_sampling = %d' % args.negative_adversarial_sampling)
-    logging.info('hidden_dim = %d' % args.hidden_dim)
-    logging.info('gamma = %f' % args.gamma)
-    logging.info('negative_adversarial_sampling = %s' % str(args.negative_adversarial_sampling))
-    if args.negative_adversarial_sampling:
-        logging.info('adversarial_temperature = %f' % args.adversarial_temperature)
-
-    # Set valid dataloader as it would be evaluated during training
-
-    if args.do_train:
-        train_model(init_step, valid_triples, all_true_triples, kge_model, train_iterator, len(train_triples), args)
-
-    if args.evaluate_train:
-        logging.info('Evaluating on Training Dataset...')
-        model_module = kge_model.module if args.parallel else kge_model
-        metrics = model_module.test_step(kge_model, train_triples, all_true_triples, args)
-        log_metrics('Test', step, metrics)
-
-    # experiment on the updated function
-    if args.do_experiment:
-        logging.info('\n\nSTARTING EXPERIMENT\n')
-
-    # gamma1_values = np.array([args.gamma1, args.gamma1 + .5, args.gamma1 + 1])
-    '''
-    g1 = args.gamma1
-    g2 = g1 + args.diff
-    kge_model.gamma1 = g1; kge_model.gamma2 = g2
-    logging.info('gamma1 = %f' % kge_model.gamma1)
-    logging.info('gamma2 = %f' % kge_model.gamma2)
-    '''
-    train_model(init_step, valid_triples, all_true_triples, kge_model, train_iterator, rule_iterators, args)
-    # model_module = kge_model.module if args.parallel else kge_model
-    # metrics = model_module.test_step(model_module, test_triples, all_true_triples, args)
-    # log_metrics('Test', step, metrics)
-    # logging.info('\n')
-
-    if args.do_valid:
-        logging.info('Evaluating on Valid Dataset...')
-        model_module = kge_model.module if args.parallel else kge_model
-        metrics = model_module.test_step(kge_model, valid_triples, all_true_triples, args)
-        log_metrics('Valid', step, metrics)
-
-    if args.do_test:
-        logging.info('Evaluating on Test Dataset...')
-        model_module = kge_model.module if args.parallel else kge_model
-        metrics = model_module.test_step(kge_model, test_triples, all_true_triples, args)
-        log_metrics('Test', step, metrics)
-
-    if args.evaluate_train:
-        logging.info('Evaluating on Training Dataset...')
-        model_module = kge_model.module if args.parallel else kge_model
-        metrics = model_module.test_step(kge_model, train_triples, all_true_triples, args)
-        log_metrics('Test', step, metrics)
 
 
 if __name__ == '__main__':
     main(parse_args())
 
-'''
-TODO:
-    1) retest on TransRotatE (because added L2 regularization through weight decay)
-    2) include RUGE into other loss functions?
-    3) test QuatE and TransQuatE with different loss functions (and diff params)
-    4) test TransQuatE and QuatE with rule insertion
-    5) test other models with rule injection + RUGE rule injection
 
-    6) TransE returns very high negative scores, which does not work for RUGE
-
-
-
-
-
-'''

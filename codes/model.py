@@ -44,6 +44,7 @@ class KGEModel(nn.Module):
         if L1:
             print('L1 regul with coeff ', L2_COEFF)
         '''
+        print(torch.__version__)
 
         self.training_start_time = datetime.datetime.now().strftime('%Y%m%d_%H%M')
         self.model_name = model_name
