@@ -351,16 +351,16 @@ def train_model(init_step, valid_triples, all_true_triples, kge_model, adv_model
                 # logging.info('N adversarial errors per adv epoch: {}, {}'.format(errors[0], errors[-1]))
             training_logs = []
 
-        #if args.do_valid and step % args.valid_steps == 0 and step >= STEPS_BEFORE_VALID:
-        #    logging.info('Evaluating on Valid Dataset...')
-        #    model_module = kge_model.module if args.parallel else kge_model
-        #    metrics = model_module.test_step(model_module, valid_triples, all_true_triples, args)
-        #    log_metrics('Valid', step, metrics)
-        #    if args.do_grid:
-        #        info = 'Validation (%d): ' % step
-        #        for key, val in metrics.items():
-        #            info = info + key + ' - ' + str(val) + ';'
-        #        print(info)
+        if args.do_valid and step % args.valid_steps == 0 and step >= STEPS_BEFORE_VALID:
+            logging.info('Evaluating on Valid Dataset...')
+            model_module = kge_model.module if args.parallel else kge_model
+            metrics = model_module.test_step(model_module, valid_triples, all_true_triples, args)
+            log_metrics('Valid', step, metrics)
+            if args.do_grid:
+                info = 'Validation (%d): ' % step
+                for key, val in metrics.items():
+                    info = info + key + ' - ' + str(val) + ';'
+                print(info)
 
     save_variable_list = {
         'step': step,
