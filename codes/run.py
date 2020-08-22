@@ -320,12 +320,6 @@ def train_model(init_step, valid_triples, all_true_triples, kge_model, adv_model
     for step in range(init_step, args.max_steps):
         # get batches of rules
         rule_batches = {}
-        for key, iterator in rule_iterators.items():
-            rule_batches[key] = next(iterator)
-
-        # adv step
-        if args.adversarial:
-            errors = adv_model.train_adversarial(adv_model, kge_model, adv_optimizer)
         log = kge_model.train_step(kge_model, adv_model, optimizer, train_iterator, args, rules=rule_batches)
 
         training_logs.append(log)
@@ -517,10 +511,9 @@ def run_grid(nentity, nrelation, train_triples,
                                rule_iterators, args, str(idx))
 
             # VALIDATION
-            #logging.info('Evaluating on Valid Dataset...')
-
-            #metrics = kge_model.test_step(kge_model, valid_triples, all_true_triples, args)
-            #log_metrics('Valid', step, metrics)
+            logging.info('Evaluating on Valid Dataset...')
+            metrics = kge_model.test_step(kge_model, valid_triples, all_true_triples, args)
+            log_metrics('Valid', step, metrics)
             #info = 'Validation (%d): ' % step
             #for key, val in metrics.items():
             #    info = info + key + ' - ' + str(val) + ';'
@@ -697,6 +690,9 @@ def main(args):
     # set up rule iterators
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     print("is cuda available? ", torch.cuda.is_available())
+    if torch.cuda.is_available():
+        print(torch.cuda.get_device_name(0))
+
     n_batches = len(train_triples) // args.batch_size
     if n_batches < len(train_triples) / args.batch_size: n_batches += 1
 
