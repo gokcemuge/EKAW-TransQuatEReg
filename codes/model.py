@@ -1191,6 +1191,68 @@ class KGEModel(nn.Module):
         return loss_rules, rules_log
 
     @staticmethod
+    def ruge_train_step(model, optimizer, train_iterator, args, rules, show_soft):
+        ''' A single ruge train step '''
+
+        longTensor = torch.cuda.LongTensor if args.cuda else torch.LongTensor
+        floatTensor = torch.cuda.FloatTensor if args.cuda else torch.FloatTensor
+
+        model.train()
+        optimizer.zero_grad()
+
+        # predict soft labels
+        try:
+            rules = rules['ruge']
+        except:
+            ValueError("No RUGE rules were defined")
+        unlabeled_scores, soft_labels = model.predict_soft_labels(rules, args.cuda)
+        if show_soft:
+            print("Soft labels: ")
+            print(soft_labels)
+
+        positive_sample, negative_sample, subsampling_weight, mode = next(train_iterator)
+        if args.cuda:
+            positive_sample = positive_sample.cuda()
+            negative_sample = negative_sample.cuda()
+            subsampling_weight = subsampling_weight.cuda()
+
+        negative_score = model((positive_sample, negative_sample), mode=mode)
+        positive_score = model(positive_sample)
+
+        loss_args = {
+            "positive_score": positive_score,
+            'negative_score': negative_score,
+            'unlabeled_scores': unlabeled_scores,
+            'soft_labels': soft_labels}
+
+        positive_loss, negative_loss, unlabeled_loss, loss = model.Loss(**loss_args)
+
+        if args.regularization != 0.0:
+            # Use L3 regularization for ComplEx and DistMult
+            regularization = args.regularization * (
+                    model.entity_embedding.norm(p=3) ** 3 +
+                    model.relation_embedding.norm(p=3).norm(p=3) ** 3
+            )
+            loss = loss + regularization
+            regularization_log = {'regularization': regularization.item()}
+        else:
+            regularization_log = {}
+
+        loss.backward()
+        model.check_nans(model)
+        optimizer.step()
+
+        log = {
+            **regularization_log,
+            'positive_sample_loss': positive_loss,
+            'negative_sample_loss': negative_loss,
+            'unlabeled_sample_loss': unlabeled_loss,
+            'loss': loss.item()
+        }
+
+        return log
+
+    @staticmethod
     def train_step(model, adv_model, optimizer, train_iterator, args, rules=None):
         '''
         A single train step. Apply back-propation and return the loss
@@ -1570,7 +1632,8 @@ class KGEModel(nn.Module):
                 metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
 
         return metrics
-    '''#!/usr/bin/python3
+    '''  # !/usr/bin/python3
+
 
 from __future__ import absolute_import
 from __future__ import division
@@ -1639,19 +1702,19 @@ class KGEModel(nn.Module):
             requires_grad=False
         )
 
-        #self.xi = nn.Parameter(torch.zeros(ntriples, 1))
-        #nn.init.uniform_(
+        # self.xi = nn.Parameter(torch.zeros(ntriples, 1))
+        # nn.init.uniform_(
         #    tensor=self.xi,
         #    a=-0.1,
         #    b=0.1
-        #)
+        # )
 
-        #self.xi_neg = nn.Parameter(torch.zeros(ntriples, 1))
-        #nn.init.uniform_(
+        # self.xi_neg = nn.Parameter(torch.zeros(ntriples, 1))
+        # nn.init.uniform_(
         #    tensor=self.xi_neg,
         #    a=-0.1,
         #    b=0.1
-        #)
+        # )
 
         ent_dim_mult, rel_dim_mult = self.compute_multipliers()
 
@@ -1681,7 +1744,6 @@ class KGEModel(nn.Module):
             self.mapping_regularizer = nn.Parameter(torch.zeros(nentity, mult * hidden_dim))
             self.initialize(self.rotator_head, nrelation, hidden_dim)
             self.initialize(self.mapping_regularizer, nentity, hidden_dim)
-
 
         # set rule info
         self.ruge = args.ruge
@@ -1720,7 +1782,7 @@ class KGEModel(nn.Module):
         return all_entities
 
     def load_relations(self, args):
-        data_path = args\
+        data_path = args \
             .data_path
         all_relations = pd.read_csv(os.path.join(data_path, 'relations.dict'), delimiter='\t',
                                     names=["id", "relations"],
@@ -1839,7 +1901,7 @@ class KGEModel(nn.Module):
                 dim=0,
                 index=indices
             ).unsqueeze(1)
-            #relation_dict = {'rotator_head': rotator_head}
+            # relation_dict = {'rotator_head': rotator_head}
             relation_dict['rotator_head'] = rotator_head
             # relation_list = [relation_head, relation_tail]
 
@@ -1878,9 +1940,9 @@ class KGEModel(nn.Module):
             mapping_regularizer = torch.index_select(
                 self.mapping_regularizer,
                 dim=0,
-                index=indices_heads) # TODO: checked
+                index=indices_heads)  # TODO: checked
 
-            #entity_dict = {'mapping_reqularizer': mapping_reqularizer, 'head': head, 'tail': tail}
+            # entity_dict = {'mapping_reqularizer': mapping_reqularizer, 'head': head, 'tail': tail}
             return head, tail, mapping_regularizer
 
         return head, tail
@@ -1911,8 +1973,8 @@ class KGEModel(nn.Module):
 
             elif mode == 'head-batch':
                 tail_part, head_part = sample
-                #tail part has positive triples  h,r,t
-                #head_part has corrupted heads only h'X 10
+                # tail part has positive triples  h,r,t
+                # head_part has corrupted heads only h'X 10
                 batch_size, negative_sample_size = head_part.size(0), head_part.size(1)
 
                 head, tail, mapping_regularizer = self.entities_select(head_part.view(-1), tail_part[:, 2])
@@ -2238,14 +2300,14 @@ class KGEModel(nn.Module):
         score = torch.sum(score, -1)
         return score
         # TODO: check here
-        #score_r = rotated_head_real * t
-        #score_i = rotated_head_i * ti
-        #score_j = rotated_head_j * tj
-        #score_k = rotated_head_k * tk
+        # score_r = rotated_head_real * t
+        # score_i = rotated_head_i * ti
+        # score_j = rotated_head_j * tj
+        # score_k = rotated_head_k * tk
 
-        #score = torch.stack([score_r, score_i, score_j, score_k], dim=0)
-        #score = score.norm(dim=0)
-        #return score.sum(dim=2)
+        # score = torch.stack([score_r, score_i, score_j, score_k], dim=0)
+        # score = score.norm(dim=0)
+        # return score.sum(dim=2)
 
     def TransQuatE(self, head, rotator_head, rotator_tail, translation, tail):
         head, head_i, head_j, head_k = torch.chunk(head, 4, dim=2)
@@ -2460,7 +2522,6 @@ class KGEModel(nn.Module):
 
         # regul2 = torch.mean(r**2) + torch.mean(ri**2) + torch.mean(rj**2) + torch.mean(rk**2)
 
-
         negative_loss = torch.mean(self.criterion(-negative_score))
         positive_loss = torch.mean(self.criterion(positive_score))
 
@@ -2470,11 +2531,11 @@ class KGEModel(nn.Module):
         return positive_loss, negative_loss, loss
 
     def rotate_loss(self, positive_score, negative_score, subsampling_weight, args):
-        #if self.model_name != 'ComplEx' and self.model_name != 'QuatE':
+        # if self.model_name != 'ComplEx' and self.model_name != 'QuatE':
         if self.model_name != 'ComplEx' and self.model_name != 'QuatE':
             negative_score = self.gamma.item() - negative_score
             positive_score = self.gamma.item() - positive_score
-        #TODO: quate ise regularizerla topla burda test yap sonra
+        # TODO: quate ise regularizerla topla burda test yap sonra
         if args.negative_adversarial_sampling:
             # In self-adversarial sampling, we do not apply back-propagation on the sampling weight
             negative_score = (F.softmax(negative_score * args.adversarial_temperature, dim=1).detach()
@@ -2916,8 +2977,23 @@ class KGEModel(nn.Module):
 
         model.eval()
 
-        rank_file_name = str(model.model_name) +"_gamma"+ str(int(model.gamma.item()))+"_dim" + str(model.hidden_dim) +"_"+ str(model.training_start_time)
-        rank_file_loc = "data/SD2020/ranked_result_" + str(rank_file_name)+".txt"
+        rank_file_name = str(model.model_name) + "_gamma" + str(int(model.gamma.item())) + "_dim" + str(
+            model.hidden_dim) + "_" + str(model.training_start_time)
+        rank_file_loc = "data/SD2020/ranked_result_" + str(rank_file_name) + ".txt"
+
+        # TODO: create new test function by removing head-bacthes
+        # test_dataloader_head = DataLoader(
+        #    TestDataset(
+        #        test_triples,
+        #        all_true_triples,
+        #        args.nentity,
+        #        args.nrelation,
+        #        'head-batch'
+        #    ),
+        #    batch_size=args.test_batch_size,
+        #    num_workers=max(1, args.cpu_num // 2),
+        #    collate_fn=TestDataset.collate_fn
+        # )
 
         test_dataloader_tail = DataLoader(
             TestDataset(
@@ -2932,7 +3008,7 @@ class KGEModel(nn.Module):
             collate_fn=TestDataset.collate_fn
         )
 
-        #test_dataset_list = [test_dataloader_head, test_dataloader_tail]
+        # test_dataset_list = [test_dataloader_head, test_dataloader_tail]
         test_dataset_list = [test_dataloader_tail]
 
         logs = []
@@ -2952,10 +3028,10 @@ class KGEModel(nn.Module):
                     # negative samples are corrupted heads or tails depends on mode
                     if args.cuda:
                         positive_sample = positive_sample.cuda()
-                        #here
-                        #print("positive sample(h_r_t)", positive_sample.size()) ([16, 3])
+                        # here
+                        # print("positive sample(h_r_t)", positive_sample.size()) ([16, 3])
                         negative_sample = negative_sample.cuda()
-                        #print("negative sample(tails)", negative_sample.size()) [16, 68907])
+                        # print("negative sample(tails)", negative_sample.size()) [16, 68907])
                         filter_bias = filter_bias.cuda()
 
                     batch_size = positive_sample.size(0)
@@ -2964,22 +3040,22 @@ class KGEModel(nn.Module):
                     # all the pos and neg samples score
                     if model.loss_name == 'quate':
                         score = -score
-                    #TODO: for quate?
+                    # TODO: for quate?
                     elif model.model_name != 'ComplEx' and model.model_name != 'QuatE':
                         score = model.gamma.item() - score
                     score += filter_bias
                     # Explicitly sort all the entities to ensure that there is no test exposure bias
-                    argsort = torch.argsort(score, dim=1, descending=True) #returns index after sort
+                    argsort = torch.argsort(score, dim=1, descending=True)  # returns index after sort
 
                     if mode == 'head-batch':
 
-                        positive_arg = positive_sample[:, 0] # get the positive head
-                        #positive_rel = positive_sample[:, 1]
+                        positive_arg = positive_sample[:, 0]  # get the positive head
+                        # positive_rel = positive_sample[:, 1]
 
                     elif mode == 'tail-batch':
 
-                        positive_arg = positive_sample[:, 2] # get the positive tail
-                        #positive_rel = positive_sample[:, 1]
+                        positive_arg = positive_sample[:, 2]  # get the positive tail
+                        # positive_rel = positive_sample[:, 1]
                     else:
                         raise ValueError('mode %s not supported' % mode)
                     ranked_triples = ""
@@ -3020,24 +3096,23 @@ class KGEModel(nn.Module):
                         logging.info('Evaluating the model... (%d/%d)' % (step, total_steps))
                     step += 1
 
-                    #if args.do_test:
-                        #print("Creating results of total :"+str(ranked_triples.count("\n"))+" lines")
-                        #ranked_triple_file = io.open(rank_file_loc, "a+", encoding="utf-8")
-                        #ranked_triple_file.write(ranked_triples)
-                        #ranked_triple_file.close()
+                    # if args.do_test:
+                    # print("Creating results of total :"+str(ranked_triples.count("\n"))+" lines")
+                    # ranked_triple_file = io.open(rank_file_loc, "a+", encoding="utf-8")
+                    # ranked_triple_file.write(ranked_triples)
+                    # ranked_triple_file.close()
         metrics = {}
         for metric in logs[0].keys():
             metrics[metric] = sum([log[metric] for log in logs]) / len(logs)
 
         return metrics
 
-
     '''
     @staticmethod
     def test_step(model, test_triples, all_true_triples, args):
-        
+
         #Evaluate the model on test or valid datasets
-        
+
 
         model.eval()
 
