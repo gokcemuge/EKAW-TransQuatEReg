@@ -148,7 +148,8 @@ class KGEModel(nn.Module):
         return all_entities
 
     def load_relations(self, args):
-        data_path = args.data_path
+        data_path = args\
+            .data_path
         all_relations = pd.read_csv(os.path.join(data_path, 'relations.dict'), delimiter='\t',
                                     names=["id", "relations"],
                                     dtype=str)
@@ -897,6 +898,7 @@ class KGEModel(nn.Module):
         return positive_loss, negative_loss, loss
 
     def rotate_loss(self, positive_score, negative_score, subsampling_weight, args):
+        #if self.model_name != 'ComplEx' and self.model_name != 'QuatE':
         if self.model_name != 'ComplEx':
             negative_score = self.gamma.item() - negative_score
             positive_score = self.gamma.item() - positive_score
@@ -918,6 +920,15 @@ class KGEModel(nn.Module):
             negative_sample_loss = - (subsampling_weight * negative_score).sum() / subsampling_weight.sum()
 
         loss = (positive_sample_loss + negative_sample_loss) / 2
+
+        if self.model_name == 'QuatE':
+            # Use L3 regularization for ComplEx and DistMult
+            regularization = 0.000005 * (
+                    self.entity_embedding.norm(p=2) ** 2 +
+                    self.relation_embedding.norm(p=2).norm(p=2) ** 2
+            )
+            loss = loss + regularization
+            regularization_log = {'regularization': regularization.item()}
 
         return positive_sample_loss, negative_sample_loss, loss
 
@@ -1418,6 +1429,7 @@ class KGEModel(nn.Module):
                     # all the pos and neg samples score
                     if model.loss_name == 'quate':
                         score = -score
+                    #TODO: for quate?
                     elif model.model_name != 'ComplEx':
                         score = model.gamma.item() - score
                     score += filter_bias
