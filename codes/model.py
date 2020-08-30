@@ -919,7 +919,7 @@ class KGEModel(nn.Module):
 
         loss = (positive_sample_loss + negative_sample_loss) / 2
 
-        if self.model_name == 'QuatE':
+        if self.model_name == 'QuatE' or self.model_name == 'TransQuatEReg':
             # Use L3 regularization for ComplEx and DistMult
             regularization = 0.000005 * (
                     self.entity_embedding.norm(p=2) ** 2 +
