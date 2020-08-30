@@ -1,0 +1,12 @@
+0	hasEntityType
+1	hasYear
+2	hasReferences
+3	hasTopics
+4	hasAuthors
+5	hasConfseries
+6	hasType
+7	hasCountries
+8	hasCountry
+9	hasJourname
+10	hasConfname
+11	hasStrongCountrie
