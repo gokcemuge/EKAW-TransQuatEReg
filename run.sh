@@ -46,7 +46,7 @@ then
     -g $GAMMA -a $ALPHA -adv \
     -lr $LEARNING_RATE \
     --log_steps 5000 \
-    --valid_steps 20000 \
+    --valid_steps 25000 \
     -save $SAVE --test_batch_size $TEST_BATCH_SIZE \
     ${12} ${13} ${14} ${15}
 
