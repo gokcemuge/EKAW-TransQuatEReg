@@ -3,9 +3,9 @@
 2	hasJourname
 3	hasTypes
 4	hasCountries
-5	hasTopics
-6	hasAuthors
-7	hasCountry
+5	hasAuthors
+6	hasCountry
+7	hasCso_enhanced_topics
 8	hasConfseries
 9	hasReferences
 10	hasConfname
