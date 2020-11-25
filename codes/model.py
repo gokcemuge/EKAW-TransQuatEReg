@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+# !/usr/bin/python3
 
 from __future__ import absolute_import
 from __future__ import division
@@ -110,6 +110,13 @@ class KGEModel(nn.Module):
             self.initialize(self.rotator_head, nrelation, hidden_dim)
             self.initialize(self.mapping_regularizer, nentity, hidden_dim)
 
+        if self.model_name in ['TransQuatEReg2']:
+            mult = 4 if 'Quat' in self.model_name else 1
+            self.rotator_head = nn.Parameter(torch.zeros(nrelation, mult * hidden_dim))
+            self.mapping_regularizer = nn.Parameter(torch.zeros(nrelation, mult * hidden_dim))  # ok
+            self.initialize(self.rotator_head, nrelation, hidden_dim)
+            self.initialize(self.mapping_regularizer, nrelation, hidden_dim)  # done
+
         # set rule info
         self.ruge = args.ruge
 
@@ -135,7 +142,8 @@ class KGEModel(nn.Module):
 
         # Do not forget to modify this line when you add a new model in the "forward" function
         if model_name not in ['TransE', 'DistMult', 'ComplEx', 'RotatE', 'pRotatE', 'TransRotatE', 'QuatE',
-                              'TransQuatE', 'sTransRotatE', 'sTransQuatE', 'QuatEVersor', 'TransQuatEReg']:
+                              'TransQuatE', 'sTransRotatE', 'sTransQuatE', 'QuatEVersor',
+                              'TransQuatEReg', 'TransQuatEReg2']:
             raise ValueError('model %s not supported' % model_name)
 
     def load_entities(self, args):
@@ -160,7 +168,7 @@ class KGEModel(nn.Module):
             return 2, 1
         if self.model_name in ['TransRotatE', 'ComplEx', 'DistMult', 'sTransRotatE']:
             return 2, 2
-        if self.model_name in ['QuatE', 'TransQuatE', 'sTransQuatE', 'QuatEVersor', 'TransQuatEReg']:
+        if self.model_name in ['QuatE', 'TransQuatE', 'sTransQuatE', 'QuatEVersor', 'TransQuatEReg', 'TransQuatEReg2']:
             return 4, 4
         return 1, 1
 
@@ -260,7 +268,7 @@ class KGEModel(nn.Module):
             relation_dict = {'rotator_head': relation_head, 'rotator_tail': relation_tail}
             # relation_list = [relation_head, relation_tail]
 
-        if self.model_name in ['TransQuatEReg']:
+        if self.model_name in ['TransQuatEReg' ,'TransQuatEReg2']:  # ok
             rotator_head = torch.index_select(
                 self.rotator_head,
                 dim=0,
@@ -288,6 +296,15 @@ class KGEModel(nn.Module):
             relation_dict['translation'] = relation
             # relation_list.append(relation)
 
+        if self.model_name in ['TransQuatEReg2']:
+            mapping_regularizer = torch.index_select(
+                self.mapping_regularizer,
+                dim=0,
+                index=indices).unsqueeze(1)  # ok gibi
+
+            # entity_dict = {'mapping_reqularizer': mapping_reqularizer, 'head': head, 'tail': tail}
+            return relation_dict, mapping_regularizer
+
         return relation_dict
 
     def entities_select(self, indices_heads, indices_tails):
@@ -301,7 +318,7 @@ class KGEModel(nn.Module):
             dim=0,
             index=indices_tails)
 
-        if self.model_name in ['TransQuatEReg']:
+        if self.model_name in ['TransQuatEReg']: # ok
             mapping_regularizer = torch.index_select(
                 self.mapping_regularizer,
                 dim=0,
@@ -370,6 +387,77 @@ class KGEModel(nn.Module):
                 'tail': tail,
                 'mapping_regularizer': mapping_regularizer
             }
+        elif self.model_name in ['TransQuatEReg2']:
+            if mode == 'single':
+                '''
+                batch_size, negative_sample_size = sample.size(0), 1
+                head, tail, mapping_regularizer = self.entities_select(sample[:, 0], sample[:, 2])
+                head = head.unsqueeze(1)
+                tail = tail.unsqueeze(1)
+                mapping_regularizer = mapping_regularizer.unsqueeze(1)
+
+                relation_dict = self.select_relations(sample[:, 1])
+                '''
+                batch_size, negative_sample_size = sample.size(0), 1
+                head, tail = self.entities_select(sample[:, 0], sample[:, 2])
+                head = head.unsqueeze(1)
+                tail = tail.unsqueeze(1)
+
+                relation_dict, mapping_regularizer = self.select_relations(sample[:, 1])
+
+            elif mode == 'head-batch':
+                '''
+                tail_part, head_part = sample
+                # tail part has positive triples  h,r,t
+                # head_part has corrupted heads only h'X 10
+                batch_size, negative_sample_size = head_part.size(0), head_part.size(1)
+
+                head, tail, mapping_regularizer = self.entities_select(head_part.view(-1), tail_part[:, 2])
+                head = head.view(batch_size, negative_sample_size, -1)
+                tail = tail.unsqueeze(1)
+                mapping_regularizer = mapping_regularizer.view(batch_size, negative_sample_size, -1)
+
+                relation_dict = self.select_relations(tail_part[:, 1])
+                '''
+                tail_part, head_part = sample
+                batch_size, negative_sample_size = head_part.size(0), head_part.size(1)
+
+                head, tail = self.entities_select(head_part.view(-1), tail_part[:, 2])
+                head = head.view(batch_size, negative_sample_size, -1)
+                tail = tail.unsqueeze(1)
+
+                relation_dict, mapping_regularizer = self.select_relations(tail_part[:, 1])
+
+            elif mode == 'tail-batch':
+                ''' 
+                head_part, tail_part = sample
+                # head_part has positive triples  h,r,t
+                # tail_part has corrupted tails only h'X 10
+
+                batch_size, negative_sample_size = tail_part.size(0), tail_part.size(1)
+                head, tail, mapping_regularizer = self.entities_select(head_part[:, 0], tail_part.view(-1))
+                head = head.unsqueeze(1)
+                tail = tail.view(batch_size, negative_sample_size, -1)
+                mapping_regularizer = mapping_regularizer.unsqueeze(1)
+
+                relation_dict = self.select_relations(head_part[:, 1])
+                '''
+                head_part, tail_part = sample
+                batch_size, negative_sample_size = tail_part.size(0), tail_part.size(1)
+                head, tail = self.entities_select(head_part[:, 0], tail_part.view(-1))
+                head = head.unsqueeze(1)
+                tail = tail.view(batch_size, negative_sample_size, -1)
+
+                relation_dict, mapping_regularizer = self.select_relations(head_part[:, 1])
+
+            else:
+                raise ValueError('mode %s not supported' % mode)
+            arg_dict = {
+                'head': head,
+                **relation_dict,
+                'tail': tail,
+                'mapping_regularizer': mapping_regularizer
+            }
         else:
             if mode == 'single':
                 batch_size, negative_sample_size = sample.size(0), 1
@@ -409,7 +497,7 @@ class KGEModel(nn.Module):
         # arg_list = [head] + relation_list + [tail]
         # arg_list += [mode] if self.model_name not in ['biRotatE', 'TransRotatE', 'TransQuatE', 'QuatE', 'sTransQuatE','sTransRotatE'] else []
         if self.model_name not in ['biRotatE', 'TransRotatE', 'TransQuatE', 'QuatE', 'sTransQuatE', 'sTransRotatE',
-                                   'QuatEVersor', 'TransQuatEReg']:
+                                   'QuatEVersor', 'TransQuatEReg' ,'TransQuatEReg2']:
             arg_dict['mode'] = mode
         score = self.compute_score(arg_dict)
         return score
@@ -428,7 +516,8 @@ class KGEModel(nn.Module):
             'sTransRotatE': self.HalfRotatE,
             'sTransQuatE': self.halfTransQuatE,
             'QuatEVersor': self.QuatEVersor,
-            'TransQuatEReg': self.TransQuatEReg
+            'TransQuatEReg': self.TransQuatEReg,
+            'TransQuatEReg2': self.TransQuatEReg2
         }
 
         score = model_func[self.model_name](**arg_dict)
@@ -755,6 +844,58 @@ class KGEModel(nn.Module):
 
         return score.sum(dim=2)
 
+    def TransQuatEReg2(self, head, rotator_head, mapping_regularizer, translation, tail):
+        head_real, head_i, head_j, head_k = torch.chunk(head, 4, dim=2)
+        # print("head_real", head_real.shape)
+        rot_h, rot_hi, rot_hj, rot_hk = self.normalize_quaternion(rotator_head)  # relationdan gelen bir rotation degree
+        # print("rot_h", rot_h.shape)
+
+        # rotating head in 4 dim --- checked
+        rotated_head_real = head_real * rot_h - head_i * rot_hi - head_j * rot_hj - head_k * rot_hk
+        # print("rotated_head_real", rotated_head_real.shape)
+        # print("head_real * rot_h", (head_real * rot_h).shape)
+        rotated_head_i = head_real * rot_hi + head_i * rot_h + head_j * rot_hk - head_k * rot_hj
+        rotated_head_j = head_real * rot_hj - head_i * rot_hk + head_j * rot_h + head_k * rot_hi
+        rotated_head_k = head_real * rot_hk + head_i * rot_hj - head_j * rot_hi + head_k * rot_h
+
+        # now translating head
+        tran_real, tran_i, tran_j, tran_k = torch.chunk(translation, 4, dim=2)  # by relation
+        # print("tran_real", tran_real.shape)
+        translated_head_real = rotated_head_real + tran_real
+        # print("translated_head_real = rotated_head_real + tran_real", translated_head_real.shape)
+        translated_head_i = rotated_head_i + tran_i
+        translated_head_j = rotated_head_j + tran_j
+        translated_head_k = rotated_head_k + tran_k
+        # -----------------------------------------------------#
+        # mapping_regularizer_real, mapping_regularizer_i, mapping_regularizer_j, mapping_regularizer_k = \
+        #    torch.chunk(mapping_regularizer, 4, dim=2)
+        # TODO:
+        mapping_regularizer_real, mapping_regularizer_i, mapping_regularizer_j, mapping_regularizer_k = self.normalize_quaternion(
+            mapping_regularizer)
+        # print("mapping_regularizer_real", mapping_regularizer_real.shape)
+
+        tail_real, tail_i, tail_j, tail_k = torch.chunk(tail, 4, dim=2)
+
+        # rotating mapping_regularizer in 4 dim by tail
+        # --- checked
+        rotated_mapping_regularizer_real = mapping_regularizer_real * tail_real - mapping_regularizer_i * tail_i - mapping_regularizer_j * tail_j - mapping_regularizer_k * tail_k
+        # print("mapping_regularizer_real * tail_real", (mapping_regularizer_real * tail_real).shape)
+        rotated_mapping_regularizer_i = mapping_regularizer_real * tail_i + mapping_regularizer_i * tail_real + mapping_regularizer_j * tail_k - mapping_regularizer_k * tail_j
+        rotated_mapping_regularizer_j = mapping_regularizer_real * tail_j - mapping_regularizer_i * tail_k + mapping_regularizer_j * tail_real + mapping_regularizer_k * tail_i
+        rotated_mapping_regularizer_k = mapping_regularizer_real * tail_k + mapping_regularizer_i * tail_j - mapping_regularizer_j * tail_i + mapping_regularizer_k * tail_real
+
+        score_r = translated_head_real - rotated_mapping_regularizer_real
+        # print("score_r", score_r.shape)
+        score_i = translated_head_i - rotated_mapping_regularizer_i
+        score_j = translated_head_j - rotated_mapping_regularizer_j
+        score_k = translated_head_k - rotated_mapping_regularizer_k
+
+        score = torch.stack([score_r, score_i, score_j, score_k], dim=0)
+        # print("score stack", score.shape)
+        score = score.norm(dim=0)
+
+        return score.sum(dim=2)
+
     def QuatEVersor(self, head, rotator_head, rotator_tail, translation, tail):
 
         s_head, x_head, y_head, z_head = torch.chunk(head, 4, dim=2)
@@ -919,7 +1060,7 @@ class KGEModel(nn.Module):
 
         loss = (positive_sample_loss + negative_sample_loss) / 2
 
-        if self.model_name == 'QuatE' or self.model_name == 'TransQuatEReg':
+        if self.model_name == 'QuatE' or self.model_name == 'TransQuatEReg 'or self.model_name == 'TransQuatEReg2':
             # Use L3 regularization for ComplEx and DistMult
             regularization = 0.000005 * (
                     self.entity_embedding.norm(p=2) ** 2 +
@@ -1158,7 +1299,7 @@ class KGEModel(nn.Module):
             nan4 = torch.isnan(model.rotator_tail.grad).sum()
         if model.model_name in ['sTransRotatE', 'sTransQuatE']:
             nan3 = torch.isnan(model.rotator_head.grad).sum()
-        if model.model_name in ['TransQuatEReg']:
+        if model.model_name in ['TransQuatEReg' ,'TransQuatEReg2']:
             nan3 = torch.isnan(model.rotator_head.grad).sum()
             nan4 = torch.isnan(model.mapping_regularizer.grad).sum()
 
